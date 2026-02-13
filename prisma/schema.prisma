@@ -1,0 +1,128 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  USER
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+}
+
+enum MarketSegment {
+  STOCK
+  AUCTION
+  FUTURES
+  OPTIONS
+  FOREX
+  CRYPTO
+  COMMODITIES
+}
+
+enum AccountType {
+  DEMO
+  LIVE
+  FUNDED
+}
+
+enum TradeDirection {
+  BUY
+  SELL
+}
+
+enum TradeStatus {
+  OPEN
+  CLOSED
+}
+
+enum TradeResult {
+  PROFIT
+  LOSS
+  BREAK_EVEN
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String?
+  role          UserRole       @default(USER)
+  authProvider  AuthProvider   @default(EMAIL)
+  googleId      String?        @unique
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  otpSessions   OtpSession[]
+  tradeAccounts TradeAccount[]
+}
+
+model OtpSession {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otp       String
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+}
+
+model TradeAccount {
+  id                  String        @id @default(uuid())
+  userId              String
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountName         String
+  brokerName          String
+  marketSegment       MarketSegment
+  currencyCode        String        @default("USD")
+  initialBalance      Decimal       @db.Decimal(15, 2)
+  currentBalance      Decimal       @db.Decimal(15, 2)
+  accountType         AccountType
+  isActive            Boolean       @default(true)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  tradeEntries        TradeEntry[]
+  
+  @@index([userId])
+  @@index([accountType])
+  @@index([marketSegment])
+}
+
+model TradeEntry {
+  id                    String         @id @default(uuid())
+  tradeAccountId        String
+  tradeAccount          TradeAccount   @relation(fields: [tradeAccountId], references: [id], onDelete: Cascade)
+  entryDateTime         DateTime
+  instrument            String
+  direction             TradeDirection
+  entryPrice            Decimal?       @db.Decimal(15, 2)
+  positionSize          Int?
+  stopLossAmount        Decimal        @db.Decimal(15, 2)
+  takeProfitAmount      Decimal        @db.Decimal(15, 2)
+  status                TradeStatus    @default(OPEN)
+  result                TradeResult?
+  realisedProfitLoss    Decimal?       @db.Decimal(15, 2)
+  serviceCharge         Decimal        @default(0) @db.Decimal(15, 2)
+  notes                 String?        @db.Text
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  
+  @@index([tradeAccountId])
+  @@index([status])
+  @@index([entryDateTime])
+  @@index([instrument])
+}

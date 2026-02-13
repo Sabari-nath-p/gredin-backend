@@ -1,0 +1,25 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mytrade-mysql-dev
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: mytrade
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-ppassword']
+      timeout: 20s
+      retries: 10
+    networks:
+      - mytrade-network
+
+volumes:
+  mysql_dev_data:
+
+networks:
+  mytrade-network:
+    driver: bridge

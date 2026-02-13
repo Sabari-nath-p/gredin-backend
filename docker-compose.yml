@@ -1,0 +1,60 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mytrade-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: mytrade
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-ppassword']
+      timeout: 20s
+      retries: 10
+    networks:
+      - mytrade-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mytrade-app
+    restart: always
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: mysql://root:password@mysql:3306/mytrade
+      JWT_SECRET: your-secret-key-change-this-in-production
+      EMAIL_HOST: smtp.gmail.com
+      EMAIL_PORT: 587
+      EMAIL_USER: your-email@gmail.com
+      EMAIL_PASSWORD: your-app-password
+      EMAIL_FROM: noreply@mytrade.com
+      GOOGLE_CLIENT_ID: your-google-client-id
+      GOOGLE_CLIENT_SECRET: your-google-client-secret
+      GOOGLE_CALLBACK_URL: http://localhost:3000/auth/google/callback
+      PORT: 3000
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - mytrade-network
+    command: >
+      sh -c "
+        npx prisma generate &&
+        npx prisma migrate deploy &&
+        npm run start:prod
+      "
+
+volumes:
+  mysql_data:
+
+networks:
+  mytrade-network:
+    driver: bridge

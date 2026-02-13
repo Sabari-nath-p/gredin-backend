@@ -1,0 +1,89 @@
+import { TradeAccountService } from './trade-account.service';
+import { CreateTradeAccountDto } from './dto/create-trade-account.dto';
+import { UpdateTradeAccountDto } from './dto/update-trade-account.dto';
+export declare class TradeAccountController {
+    private readonly tradeAccountService;
+    constructor(tradeAccountService: TradeAccountService);
+    create(req: any, createDto: CreateTradeAccountDto): Promise<{
+        id: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        accountName: string;
+        brokerName: string;
+        marketSegment: import(".prisma/client").$Enums.MarketSegment;
+        currencyCode: string;
+        initialBalance: import("@prisma/client/runtime/library").Decimal;
+        accountType: import(".prisma/client").$Enums.AccountType;
+        currentBalance: import("@prisma/client/runtime/library").Decimal;
+    }>;
+    findAllByUser(req: any): Promise<{
+        id: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        accountName: string;
+        brokerName: string;
+        marketSegment: import(".prisma/client").$Enums.MarketSegment;
+        currencyCode: string;
+        initialBalance: import("@prisma/client/runtime/library").Decimal;
+        accountType: import(".prisma/client").$Enums.AccountType;
+        currentBalance: import("@prisma/client/runtime/library").Decimal;
+    }[]>;
+    findOne(id: string, req: any): Promise<{
+        id: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        accountName: string;
+        brokerName: string;
+        marketSegment: import(".prisma/client").$Enums.MarketSegment;
+        currencyCode: string;
+        initialBalance: import("@prisma/client/runtime/library").Decimal;
+        accountType: import(".prisma/client").$Enums.AccountType;
+        currentBalance: import("@prisma/client/runtime/library").Decimal;
+    }>;
+    update(id: string, req: any, updateDto: UpdateTradeAccountDto): Promise<{
+        id: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        accountName: string;
+        brokerName: string;
+        marketSegment: import(".prisma/client").$Enums.MarketSegment;
+        currencyCode: string;
+        initialBalance: import("@prisma/client/runtime/library").Decimal;
+        accountType: import(".prisma/client").$Enums.AccountType;
+        currentBalance: import("@prisma/client/runtime/library").Decimal;
+    }>;
+    delete(id: string, req: any): Promise<void>;
+    findAll(req: any): Promise<{
+        id: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        accountName: string;
+        brokerName: string;
+        marketSegment: import(".prisma/client").$Enums.MarketSegment;
+        currencyCode: string;
+        initialBalance: import("@prisma/client/runtime/library").Decimal;
+        accountType: import(".prisma/client").$Enums.AccountType;
+        currentBalance: import("@prisma/client/runtime/library").Decimal;
+    }[]>;
+    getStats(req: any): Promise<{
+        totalAccounts: number;
+        activeAccounts: number;
+        inactiveAccounts: number;
+        accountsByType: (import(".prisma/client").Prisma.PickEnumerable<import(".prisma/client").Prisma.TradeAccountGroupByOutputType, "accountType"[]> & {
+            _count: number;
+        })[];
+        accountsBySegment: (import(".prisma/client").Prisma.PickEnumerable<import(".prisma/client").Prisma.TradeAccountGroupByOutputType, "marketSegment"[]> & {
+            _count: number;
+        })[];
+    }>;
+}
