@@ -9,16 +9,49 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CloseTradeDto = void 0;
+exports.CloseTradeDto = exports.CloseTradeFieldValueDto = void 0;
 const swagger_1 = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
+const class_validator_2 = require("class-validator");
 const create_trade_entry_dto_1 = require("./create-trade-entry.dto");
+class CloseTradeFieldValueDto {
+    fieldId;
+    textValue;
+    booleanValue;
+    imageUrl;
+}
+exports.CloseTradeFieldValueDto = CloseTradeFieldValueDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Template field ID' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], CloseTradeFieldValueDto.prototype, "fieldId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Text value', required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CloseTradeFieldValueDto.prototype, "textValue", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Boolean value', required: false }),
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], CloseTradeFieldValueDto.prototype, "booleanValue", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Image URL', required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CloseTradeFieldValueDto.prototype, "imageUrl", void 0);
 class CloseTradeDto {
     result;
     realisedProfitLoss;
     serviceCharge;
     notes;
+    fieldValues;
 }
 exports.CloseTradeDto = CloseTradeDto;
 __decorate([
@@ -64,4 +97,16 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CloseTradeDto.prototype, "notes", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Dynamic field values from log template',
+        type: [CloseTradeFieldValueDto],
+        required: false,
+    }),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_2.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => CloseTradeFieldValueDto),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CloseTradeDto.prototype, "fieldValues", void 0);
 //# sourceMappingURL=close-trade.dto.js.map

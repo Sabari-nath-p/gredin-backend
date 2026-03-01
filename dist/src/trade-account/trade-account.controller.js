@@ -27,8 +27,8 @@ let TradeAccountController = class TradeAccountController {
     async create(req, createDto) {
         return this.tradeAccountService.create(req.user.userId, createDto);
     }
-    async findAllByUser(req) {
-        return this.tradeAccountService.findAllByUser(req.user.userId);
+    async findAllByUser(req, page, limit) {
+        return this.tradeAccountService.findAllByUser(req.user.userId, page ? parseInt(page, 10) : 1, limit ? parseInt(limit, 10) : 100);
     }
     async findOne(id, req) {
         return this.tradeAccountService.findOne(id, req.user.userId, req.user.role);
@@ -71,14 +71,18 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, swagger_1.ApiOperation)({
-        summary: 'Get all trade accounts for current user',
+        summary: 'Get all trade accounts for current user (paginated)',
         description: 'Retrieve all trading accounts belonging to the authenticated user.',
     }),
+    (0, swagger_1.ApiQuery)({ name: 'page', required: false, type: Number }),
+    (0, swagger_1.ApiQuery)({ name: 'limit', required: false, type: Number }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'List of trade accounts retrieved successfully' }),
     (0, swagger_1.ApiResponse)({ status: 401, description: 'Unauthorized' }),
     __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Query)('page')),
+    __param(2, (0, common_1.Query)('limit')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", Promise)
 ], TradeAccountController.prototype, "findAllByUser", null);
 __decorate([

@@ -6,6 +6,7 @@ import {
     Delete,
     Body,
     Param,
+    Query,
     UseGuards,
     Request,
     HttpCode,
@@ -17,6 +18,7 @@ import {
     ApiResponse,
     ApiBearerAuth,
     ApiParam,
+    ApiQuery,
 } from '@nestjs/swagger';
 import { TradeEntryService } from './trade-entry.service';
 import { CreateTradeEntryDto } from './dto/create-trade-entry.dto';
@@ -52,16 +54,29 @@ export class TradeEntryController {
 
     @Get('account/:tradeAccountId')
     @ApiOperation({
-        summary: 'Get all trade entries for a specific account',
-        description: 'Retrieve all trade entries for a specific trade account. Users can only view their own trades unless SUPER_ADMIN.',
+        summary: 'Get all trade entries for a specific account (paginated)',
+        description: 'Retrieve all trade entries for a specific trade account with pagination. Users can only view their own trades unless SUPER_ADMIN.',
     })
     @ApiParam({ name: 'tradeAccountId', description: 'Trade account ID' })
+    @ApiQuery({ name: 'page', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
     @ApiResponse({ status: 200, description: 'Trade entries retrieved successfully' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden - Not your account' })
     @ApiResponse({ status: 404, description: 'Trade account not found' })
-    async findAllByAccount(@Param('tradeAccountId') tradeAccountId: string, @Request() req) {
-        return this.tradeEntryService.findAllByAccount(tradeAccountId, req.user.userId, req.user.role);
+    async findAllByAccount(
+        @Param('tradeAccountId') tradeAccountId: string,
+        @Request() req,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+    ) {
+        return this.tradeEntryService.findAllByAccount(
+            tradeAccountId,
+            req.user.userId,
+            req.user.role,
+            page ? parseInt(page, 10) : 1,
+            limit ? parseInt(limit, 10) : 20,
+        );
     }
 
     @Get('account/:tradeAccountId/stats')

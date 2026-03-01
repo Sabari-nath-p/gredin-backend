@@ -16,6 +16,9 @@ const auth_module_1 = require("./auth/auth.module");
 const users_module_1 = require("./users/users.module");
 const trade_account_module_1 = require("./trade-account/trade-account.module");
 const trade_entry_module_1 = require("./trade-entry/trade-entry.module");
+const log_template_module_1 = require("./log-template/log-template.module");
+const s3_module_1 = require("./s3/s3.module");
+const chat_module_1 = require("./chat/chat.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -30,6 +33,9 @@ exports.AppModule = AppModule = __decorate([
             users_module_1.UsersModule,
             trade_account_module_1.TradeAccountModule,
             trade_entry_module_1.TradeEntryModule,
+            log_template_module_1.LogTemplateModule,
+            s3_module_1.S3Module,
+            chat_module_1.ChatModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

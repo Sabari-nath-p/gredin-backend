@@ -7,6 +7,9 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { TradeAccountModule } from './trade-account/trade-account.module';
 import { TradeEntryModule } from './trade-entry/trade-entry.module';
+import { LogTemplateModule } from './log-template/log-template.module';
+import { S3Module } from './s3/s3.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -18,6 +21,9 @@ import { TradeEntryModule } from './trade-entry/trade-entry.module';
     UsersModule,
     TradeAccountModule,
     TradeEntryModule,
+    LogTemplateModule,
+    S3Module,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

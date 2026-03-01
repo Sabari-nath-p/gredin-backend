@@ -17,21 +17,36 @@ export declare class TradeAccountController {
         initialBalance: import("@prisma/client/runtime/library").Decimal;
         accountType: import(".prisma/client").$Enums.AccountType;
         currentBalance: import("@prisma/client/runtime/library").Decimal;
+        logTemplateId: string | null;
     }>;
-    findAllByUser(req: any): Promise<{
-        id: string;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-        accountName: string;
-        brokerName: string;
-        marketSegment: import(".prisma/client").$Enums.MarketSegment;
-        currencyCode: string;
-        initialBalance: import("@prisma/client/runtime/library").Decimal;
-        accountType: import(".prisma/client").$Enums.AccountType;
-        currentBalance: import("@prisma/client/runtime/library").Decimal;
-    }[]>;
+    findAllByUser(req: any, page?: string, limit?: string): Promise<{
+        data: ({
+            logTemplate: {
+                name: string;
+                id: string;
+            } | null;
+        } & {
+            id: string;
+            isActive: boolean;
+            createdAt: Date;
+            updatedAt: Date;
+            userId: string;
+            accountName: string;
+            brokerName: string;
+            marketSegment: import(".prisma/client").$Enums.MarketSegment;
+            currencyCode: string;
+            initialBalance: import("@prisma/client/runtime/library").Decimal;
+            accountType: import(".prisma/client").$Enums.AccountType;
+            currentBalance: import("@prisma/client/runtime/library").Decimal;
+            logTemplateId: string | null;
+        })[];
+        meta: {
+            total: number;
+            page: number;
+            limit: number;
+            totalPages: number;
+        };
+    }>;
     findOne(id: string, req: any): Promise<{
         id: string;
         isActive: boolean;
@@ -45,6 +60,7 @@ export declare class TradeAccountController {
         initialBalance: import("@prisma/client/runtime/library").Decimal;
         accountType: import(".prisma/client").$Enums.AccountType;
         currentBalance: import("@prisma/client/runtime/library").Decimal;
+        logTemplateId: string | null;
     }>;
     update(id: string, req: any, updateDto: UpdateTradeAccountDto): Promise<{
         id: string;
@@ -59,6 +75,7 @@ export declare class TradeAccountController {
         initialBalance: import("@prisma/client/runtime/library").Decimal;
         accountType: import(".prisma/client").$Enums.AccountType;
         currentBalance: import("@prisma/client/runtime/library").Decimal;
+        logTemplateId: string | null;
     }>;
     delete(id: string, req: any): Promise<void>;
     findAll(req: any): Promise<{
@@ -74,6 +91,7 @@ export declare class TradeAccountController {
         initialBalance: import("@prisma/client/runtime/library").Decimal;
         accountType: import(".prisma/client").$Enums.AccountType;
         currentBalance: import("@prisma/client/runtime/library").Decimal;
+        logTemplateId: string | null;
     }[]>;
     getStats(req: any): Promise<{
         totalAccounts: number;

@@ -67,6 +67,8 @@ model User {
   updatedAt     DateTime       @updatedAt
   otpSessions   OtpSession[]
   tradeAccounts TradeAccount[]
+  logTemplates  LogTemplate[]
+  chatSessions  ChatSession[]
 }
 
 model OtpSession {
@@ -96,33 +98,130 @@ model TradeAccount {
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   tradeEntries        TradeEntry[]
+  logTemplateId       String?
+  logTemplate         LogTemplate?     @relation("AccountTemplate", fields: [logTemplateId], references: [id], onDelete: SetNull)
+  chatSessions        ChatSession[]    @relation("ChatAccount")
   
   @@index([userId])
   @@index([accountType])
   @@index([marketSegment])
+  @@index([logTemplateId])
 }
 
 model TradeEntry {
-  id                    String         @id @default(uuid())
+  id                    String              @id @default(uuid())
   tradeAccountId        String
-  tradeAccount          TradeAccount   @relation(fields: [tradeAccountId], references: [id], onDelete: Cascade)
+  tradeAccount          TradeAccount        @relation(fields: [tradeAccountId], references: [id], onDelete: Cascade)
   entryDateTime         DateTime
   instrument            String
   direction             TradeDirection
-  entryPrice            Decimal?       @db.Decimal(15, 2)
+  entryPrice            Decimal?            @db.Decimal(15, 2)
   positionSize          Int?
-  stopLossAmount        Decimal        @db.Decimal(15, 2)
-  takeProfitAmount      Decimal        @db.Decimal(15, 2)
-  status                TradeStatus    @default(OPEN)
+  stopLossAmount        Decimal             @db.Decimal(15, 2)
+  takeProfitAmount      Decimal             @db.Decimal(15, 2)
+  status                TradeStatus         @default(OPEN)
   result                TradeResult?
-  realisedProfitLoss    Decimal?       @db.Decimal(15, 2)
-  serviceCharge         Decimal        @default(0) @db.Decimal(15, 2)
-  notes                 String?        @db.Text
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  realisedProfitLoss    Decimal?            @db.Decimal(15, 2)
+  serviceCharge         Decimal             @default(0) @db.Decimal(15, 2)
+  notes                 String?             @db.Text
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  fieldValues           TradeFieldValue[]
   
   @@index([tradeAccountId])
   @@index([status])
   @@index([entryDateTime])
   @@index([instrument])
+}
+
+// ─── Log Templates ───
+
+enum FieldType {
+  TEXT
+  LONG_TEXT
+  CHECKBOX
+  IMAGE
+}
+
+model LogTemplate {
+  id          String               @id @default(uuid())
+  userId      String
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?              @db.Text
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  fields      LogTemplateField[]
+  accounts    TradeAccount[]       @relation("AccountTemplate")
+
+  @@index([userId])
+}
+
+model LogTemplateField {
+  id            String            @id @default(uuid())
+  templateId    String
+  template      LogTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  fieldName     String
+  fieldType     FieldType
+  fieldOrder    Int
+  placeholder   String?
+  defaultValue  String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  values        TradeFieldValue[]
+
+  @@index([templateId])
+}
+
+model TradeFieldValue {
+  id            String            @id @default(uuid())
+  tradeEntryId  String
+  tradeEntry    TradeEntry        @relation(fields: [tradeEntryId], references: [id], onDelete: Cascade)
+  fieldId       String
+  field         LogTemplateField  @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  textValue     String?           @db.Text
+  booleanValue  Boolean?
+  imageUrl      String?           @db.Text
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([tradeEntryId, fieldId])
+  @@index([tradeEntryId])
+  @@index([fieldId])
+}
+
+// ─── AI Chat ───
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+}
+
+model ChatSession {
+  id              String         @id @default(uuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String         @default("New Chat")
+  tradeAccountId  String?
+  tradeAccount    TradeAccount?  @relation("ChatAccount", fields: [tradeAccountId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  messages        ChatMessage[]
+
+  @@index([userId])
+  @@index([tradeAccountId])
+}
+
+model ChatMessage {
+  id            String          @id @default(uuid())
+  sessionId     String
+  session       ChatSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role          ChatMessageRole
+  content       String          @db.Text
+  sqlQuery      String?         @db.Text
+  sqlResult     String?         @db.LongText
+  createdAt     DateTime        @default(now())
+
+  @@index([sessionId])
 }

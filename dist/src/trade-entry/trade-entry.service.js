@@ -60,13 +60,26 @@ let TradeEntryService = class TradeEntryService {
                     notes: createDto.notes,
                 },
             });
+            if (createDto.fieldValues && createDto.fieldValues.length > 0) {
+                for (const fv of createDto.fieldValues) {
+                    await prisma.tradeFieldValue.create({
+                        data: {
+                            tradeEntryId: tradeEntry.id,
+                            fieldId: fv.fieldId,
+                            textValue: fv.textValue ?? null,
+                            booleanValue: fv.booleanValue ?? null,
+                            imageUrl: fv.imageUrl ?? null,
+                        },
+                    });
+                }
+            }
             if (status === create_trade_entry_dto_1.TradeStatus.CLOSED) {
                 await this.updateAccountBalance(prisma, createDto.tradeAccountId, createDto.result, createDto.realisedProfitLoss, createDto.serviceCharge || 0, createDto.stopLossAmount);
             }
             return tradeEntry;
         });
     }
-    async findAllByAccount(tradeAccountId, userId, userRole) {
+    async findAllByAccount(tradeAccountId, userId, userRole, page = 1, limit = 20) {
         const tradeAccount = await this.prisma.tradeAccount.findUnique({
             where: { id: tradeAccountId },
         });
@@ -76,10 +89,25 @@ let TradeEntryService = class TradeEntryService {
         if (tradeAccount.userId !== userId && userRole !== client_2.UserRole.SUPER_ADMIN) {
             throw new common_1.ForbiddenException('You do not have access to this trade account');
         }
-        return this.prisma.tradeEntry.findMany({
-            where: { tradeAccountId },
-            orderBy: { entryDateTime: 'desc' },
-        });
+        const skip = (page - 1) * limit;
+        const [data, total] = await Promise.all([
+            this.prisma.tradeEntry.findMany({
+                where: { tradeAccountId },
+                include: {
+                    fieldValues: {
+                        include: { field: true },
+                    },
+                },
+                orderBy: { entryDateTime: 'desc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.tradeEntry.count({ where: { tradeAccountId } }),
+        ]);
+        return {
+            data,
+            meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+        };
     }
     async findOne(id, userId, userRole) {
         const tradeEntry = await this.prisma.tradeEntry.findUnique({
@@ -94,6 +122,11 @@ let TradeEntryService = class TradeEntryService {
                                 name: true,
                             },
                         },
+                    },
+                },
+                fieldValues: {
+                    include: {
+                        field: true,
                     },
                 },
             },
@@ -150,6 +183,30 @@ let TradeEntryService = class TradeEntryService {
                     notes: closeDto.notes || tradeEntry.notes,
                 },
             });
+            if (closeDto.fieldValues && closeDto.fieldValues.length > 0) {
+                for (const fv of closeDto.fieldValues) {
+                    await prisma.tradeFieldValue.upsert({
+                        where: {
+                            tradeEntryId_fieldId: {
+                                tradeEntryId: id,
+                                fieldId: fv.fieldId,
+                            },
+                        },
+                        update: {
+                            textValue: fv.textValue ?? null,
+                            booleanValue: fv.booleanValue ?? null,
+                            imageUrl: fv.imageUrl ?? null,
+                        },
+                        create: {
+                            tradeEntryId: id,
+                            fieldId: fv.fieldId,
+                            textValue: fv.textValue ?? null,
+                            booleanValue: fv.booleanValue ?? null,
+                            imageUrl: fv.imageUrl ?? null,
+                        },
+                    });
+                }
+            }
             await this.updateAccountBalance(prisma, tradeEntry.tradeAccountId, closeDto.result, closeDto.realisedProfitLoss, closeDto.serviceCharge || tradeEntry.serviceCharge.toNumber(), tradeEntry.stopLossAmount.toNumber());
             return updatedTrade;
         });
@@ -213,23 +270,56 @@ let TradeEntryService = class TradeEntryService {
         const closedTrades = await this.prisma.tradeEntry.count({
             where: { tradeAccountId, status: create_trade_entry_dto_1.TradeStatus.CLOSED },
         });
-        const profitTrades = await this.prisma.tradeEntry.count({
+        const winningTrades = await this.prisma.tradeEntry.count({
             where: { tradeAccountId, result: client_1.TradeResult.PROFIT },
         });
-        const lossTrades = await this.prisma.tradeEntry.count({
+        const losingTrades = await this.prisma.tradeEntry.count({
             where: { tradeAccountId, result: client_1.TradeResult.LOSS },
         });
         const breakEvenTrades = await this.prisma.tradeEntry.count({
             where: { tradeAccountId, result: client_1.TradeResult.BREAK_EVEN },
         });
+        const closedTradeEntries = await this.prisma.tradeEntry.findMany({
+            where: { tradeAccountId, status: create_trade_entry_dto_1.TradeStatus.CLOSED },
+        });
+        let totalProfit = 0;
+        let totalLoss = 0;
+        let largestWin = 0;
+        let largestLoss = 0;
+        for (const trade of closedTradeEntries) {
+            const pl = trade.realisedProfitLoss ? trade.realisedProfitLoss.toNumber() : 0;
+            if (trade.result === client_1.TradeResult.PROFIT) {
+                totalProfit += pl;
+                if (pl > largestWin)
+                    largestWin = pl;
+            }
+            else if (trade.result === client_1.TradeResult.LOSS) {
+                const lossAmount = trade.stopLossAmount.toNumber() + trade.serviceCharge.toNumber();
+                totalLoss += lossAmount;
+                if (lossAmount > largestLoss)
+                    largestLoss = lossAmount;
+            }
+        }
+        const netProfitLoss = totalProfit - totalLoss;
+        const averageWin = winningTrades > 0 ? totalProfit / winningTrades : 0;
+        const averageLoss = losingTrades > 0 ? totalLoss / losingTrades : 0;
+        const profitFactor = totalLoss > 0 ? totalProfit / totalLoss : totalProfit > 0 ? Infinity : 0;
         return {
             totalTrades,
             openTrades,
             closedTrades,
-            profitTrades,
-            lossTrades,
+            totalProfit,
+            totalLoss,
+            netProfitLoss,
+            winningTrades,
+            losingTrades,
             breakEvenTrades,
-            winRate: closedTrades > 0 ? (profitTrades / closedTrades) * 100 : 0,
+            winRate: closedTrades > 0 ? (winningTrades / closedTrades) * 100 : 0,
+            averageWin,
+            averageLoss,
+            profitFactor: profitFactor === Infinity ? 999.99 : profitFactor,
+            largestWin,
+            largestLoss,
         };
     }
     async updateAccountBalance(prisma, tradeAccountId, result, realisedProfitLoss, serviceCharge, stopLossAmount) {

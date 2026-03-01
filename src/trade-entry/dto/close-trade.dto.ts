@@ -1,7 +1,30 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNumber, IsEnum, IsNotEmpty, ValidateIf, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsEnum, IsNotEmpty, ValidateIf, IsArray, IsBoolean, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ValidateNested } from 'class-validator';
 import { TradeResult } from './create-trade-entry.dto';
+
+export class CloseTradeFieldValueDto {
+    @ApiProperty({ description: 'Template field ID' })
+    @IsString()
+    @IsNotEmpty()
+    fieldId: string;
+
+    @ApiProperty({ description: 'Text value', required: false })
+    @IsString()
+    @IsOptional()
+    textValue?: string;
+
+    @ApiProperty({ description: 'Boolean value', required: false })
+    @IsBoolean()
+    @IsOptional()
+    booleanValue?: boolean;
+
+    @ApiProperty({ description: 'Image URL', required: false })
+    @IsString()
+    @IsOptional()
+    imageUrl?: string;
+}
 
 export class CloseTradeDto {
     @ApiProperty({
@@ -42,4 +65,15 @@ export class CloseTradeDto {
     @IsString()
     @IsOptional()
     notes?: string;
+
+    @ApiProperty({
+        description: 'Dynamic field values from log template',
+        type: [CloseTradeFieldValueDto],
+        required: false,
+    })
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => CloseTradeFieldValueDto)
+    @IsOptional()
+    fieldValues?: CloseTradeFieldValueDto[];
 }

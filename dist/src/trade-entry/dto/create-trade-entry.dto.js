@@ -9,10 +9,11 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateTradeEntryDto = exports.TradeResult = exports.TradeStatus = exports.TradeDirection = void 0;
+exports.CreateTradeEntryDto = exports.TradeFieldValueDto = exports.TradeResult = exports.TradeStatus = exports.TradeDirection = void 0;
 const swagger_1 = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
+const class_validator_2 = require("class-validator");
 var TradeDirection;
 (function (TradeDirection) {
     TradeDirection["BUY"] = "BUY";
@@ -29,6 +30,37 @@ var TradeResult;
     TradeResult["LOSS"] = "LOSS";
     TradeResult["BREAK_EVEN"] = "BREAK_EVEN";
 })(TradeResult || (exports.TradeResult = TradeResult = {}));
+class TradeFieldValueDto {
+    fieldId;
+    textValue;
+    booleanValue;
+    imageUrl;
+}
+exports.TradeFieldValueDto = TradeFieldValueDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Template field ID' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], TradeFieldValueDto.prototype, "fieldId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Text value (for TEXT / LONG_TEXT fields)', required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], TradeFieldValueDto.prototype, "textValue", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Boolean value (for CHECKBOX fields)', required: false }),
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], TradeFieldValueDto.prototype, "booleanValue", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Image URL (for IMAGE fields)', required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], TradeFieldValueDto.prototype, "imageUrl", void 0);
 class CreateTradeEntryDto {
     tradeAccountId;
     entryDateTime;
@@ -43,6 +75,7 @@ class CreateTradeEntryDto {
     realisedProfitLoss;
     serviceCharge;
     notes;
+    fieldValues;
 }
 exports.CreateTradeEntryDto = CreateTradeEntryDto;
 __decorate([
@@ -186,4 +219,16 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateTradeEntryDto.prototype, "notes", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Dynamic field values from log template',
+        type: [TradeFieldValueDto],
+        required: false,
+    }),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_2.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => TradeFieldValueDto),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CreateTradeEntryDto.prototype, "fieldValues", void 0);
 //# sourceMappingURL=create-trade-entry.dto.js.map

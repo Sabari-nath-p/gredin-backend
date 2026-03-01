@@ -28,8 +28,8 @@ let TradeEntryController = class TradeEntryController {
     async create(req, createDto) {
         return this.tradeEntryService.create(req.user.userId, createDto);
     }
-    async findAllByAccount(tradeAccountId, req) {
-        return this.tradeEntryService.findAllByAccount(tradeAccountId, req.user.userId, req.user.role);
+    async findAllByAccount(tradeAccountId, req, page, limit) {
+        return this.tradeEntryService.findAllByAccount(tradeAccountId, req.user.userId, req.user.role, page ? parseInt(page, 10) : 1, limit ? parseInt(limit, 10) : 20);
     }
     async getStats(tradeAccountId, req) {
         return this.tradeEntryService.getTradeStats(tradeAccountId, req.user.userId, req.user.role);
@@ -79,18 +79,22 @@ __decorate([
 __decorate([
     (0, common_1.Get)('account/:tradeAccountId'),
     (0, swagger_1.ApiOperation)({
-        summary: 'Get all trade entries for a specific account',
-        description: 'Retrieve all trade entries for a specific trade account. Users can only view their own trades unless SUPER_ADMIN.',
+        summary: 'Get all trade entries for a specific account (paginated)',
+        description: 'Retrieve all trade entries for a specific trade account with pagination. Users can only view their own trades unless SUPER_ADMIN.',
     }),
     (0, swagger_1.ApiParam)({ name: 'tradeAccountId', description: 'Trade account ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'page', required: false, type: Number }),
+    (0, swagger_1.ApiQuery)({ name: 'limit', required: false, type: Number }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Trade entries retrieved successfully' }),
     (0, swagger_1.ApiResponse)({ status: 401, description: 'Unauthorized' }),
     (0, swagger_1.ApiResponse)({ status: 403, description: 'Forbidden - Not your account' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'Trade account not found' }),
     __param(0, (0, common_1.Param)('tradeAccountId')),
     __param(1, (0, common_1.Request)()),
+    __param(2, (0, common_1.Query)('page')),
+    __param(3, (0, common_1.Query)('limit')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, String, String]),
     __metadata("design:returntype", Promise)
 ], TradeEntryController.prototype, "findAllByAccount", null);
 __decorate([

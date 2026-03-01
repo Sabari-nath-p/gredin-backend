@@ -23,32 +23,71 @@ export declare class TradeEntryController {
         serviceCharge: import("@prisma/client/runtime/library").Decimal;
         notes: string | null;
     }>;
-    findAllByAccount(tradeAccountId: string, req: any): Promise<{
-        result: import(".prisma/client").$Enums.TradeResult | null;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        tradeAccountId: string;
-        entryDateTime: Date;
-        instrument: string;
-        direction: import(".prisma/client").$Enums.TradeDirection;
-        entryPrice: import("@prisma/client/runtime/library").Decimal | null;
-        positionSize: number | null;
-        stopLossAmount: import("@prisma/client/runtime/library").Decimal;
-        takeProfitAmount: import("@prisma/client/runtime/library").Decimal;
-        status: import(".prisma/client").$Enums.TradeStatus;
-        realisedProfitLoss: import("@prisma/client/runtime/library").Decimal | null;
-        serviceCharge: import("@prisma/client/runtime/library").Decimal;
-        notes: string | null;
-    }[]>;
+    findAllByAccount(tradeAccountId: string, req: any, page?: string, limit?: string): Promise<{
+        data: ({
+            fieldValues: ({
+                field: {
+                    id: string;
+                    createdAt: Date;
+                    updatedAt: Date;
+                    fieldOrder: number;
+                    templateId: string;
+                    fieldName: string;
+                    fieldType: import(".prisma/client").$Enums.FieldType;
+                    placeholder: string | null;
+                    defaultValue: string | null;
+                };
+            } & {
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                fieldId: string;
+                textValue: string | null;
+                booleanValue: boolean | null;
+                imageUrl: string | null;
+                tradeEntryId: string;
+            })[];
+        } & {
+            result: import(".prisma/client").$Enums.TradeResult | null;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            tradeAccountId: string;
+            entryDateTime: Date;
+            instrument: string;
+            direction: import(".prisma/client").$Enums.TradeDirection;
+            entryPrice: import("@prisma/client/runtime/library").Decimal | null;
+            positionSize: number | null;
+            stopLossAmount: import("@prisma/client/runtime/library").Decimal;
+            takeProfitAmount: import("@prisma/client/runtime/library").Decimal;
+            status: import(".prisma/client").$Enums.TradeStatus;
+            realisedProfitLoss: import("@prisma/client/runtime/library").Decimal | null;
+            serviceCharge: import("@prisma/client/runtime/library").Decimal;
+            notes: string | null;
+        })[];
+        meta: {
+            total: number;
+            page: number;
+            limit: number;
+            totalPages: number;
+        };
+    }>;
     getStats(tradeAccountId: string, req: any): Promise<{
         totalTrades: number;
         openTrades: number;
         closedTrades: number;
-        profitTrades: number;
-        lossTrades: number;
+        totalProfit: number;
+        totalLoss: number;
+        netProfitLoss: number;
+        winningTrades: number;
+        losingTrades: number;
         breakEvenTrades: number;
         winRate: number;
+        averageWin: number;
+        averageLoss: number;
+        profitFactor: number;
+        largestWin: number;
+        largestLoss: number;
     }>;
     findOne(id: string, req: any): Promise<{
         result: import(".prisma/client").$Enums.TradeResult | null;

@@ -23,11 +23,26 @@ export class TradeAccountService {
     });
   }
 
-  async findAllByUser(userId: string): Promise<TradeAccount[]> {
-    return this.prisma.tradeAccount.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAllByUser(userId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.tradeAccount.findMany({
+        where: { userId },
+        include: {
+          logTemplate: {
+            select: { id: true, name: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.tradeAccount.count({ where: { userId } }),
+    ]);
+    return {
+      data,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async findOne(id: string, userId: string, userRole: UserRole): Promise<TradeAccount> {
@@ -40,6 +55,9 @@ export class TradeAccountService {
             email: true,
             name: true,
           },
+        },
+        logTemplate: {
+          include: { fields: { orderBy: { fieldOrder: 'asc' } } },
         },
       },
     });

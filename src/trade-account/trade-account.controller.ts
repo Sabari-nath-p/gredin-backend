@@ -6,12 +6,13 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { TradeAccountService } from './trade-account.service';
 import { CreateTradeAccountDto } from './dto/create-trade-account.dto';
 import { UpdateTradeAccountDto } from './dto/update-trade-account.dto';
@@ -38,13 +39,23 @@ export class TradeAccountController {
 
   @Get()
   @ApiOperation({
-    summary: 'Get all trade accounts for current user',
+    summary: 'Get all trade accounts for current user (paginated)',
     description: 'Retrieve all trading accounts belonging to the authenticated user.',
   })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiResponse({ status: 200, description: 'List of trade accounts retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async findAllByUser(@Request() req) {
-    return this.tradeAccountService.findAllByUser(req.user.userId);
+  async findAllByUser(
+    @Request() req,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.tradeAccountService.findAllByUser(
+      req.user.userId,
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 100,
+    );
   }
 
   @Get(':id')

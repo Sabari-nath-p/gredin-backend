@@ -7,9 +7,12 @@ import {
     IsOptional,
     IsDateString,
     ValidateIf,
+    IsArray,
+    IsBoolean,
     Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ValidateNested } from 'class-validator';
 
 export enum TradeDirection {
     BUY = 'BUY',
@@ -25,6 +28,28 @@ export enum TradeResult {
     PROFIT = 'PROFIT',
     LOSS = 'LOSS',
     BREAK_EVEN = 'BREAK_EVEN',
+}
+
+export class TradeFieldValueDto {
+    @ApiProperty({ description: 'Template field ID' })
+    @IsString()
+    @IsNotEmpty()
+    fieldId: string;
+
+    @ApiProperty({ description: 'Text value (for TEXT / LONG_TEXT fields)', required: false })
+    @IsString()
+    @IsOptional()
+    textValue?: string;
+
+    @ApiProperty({ description: 'Boolean value (for CHECKBOX fields)', required: false })
+    @IsBoolean()
+    @IsOptional()
+    booleanValue?: boolean;
+
+    @ApiProperty({ description: 'Image URL (for IMAGE fields)', required: false })
+    @IsString()
+    @IsOptional()
+    imageUrl?: string;
 }
 
 export class CreateTradeEntryDto {
@@ -155,4 +180,15 @@ export class CreateTradeEntryDto {
     @IsString()
     @IsOptional()
     notes?: string;
+
+    @ApiProperty({
+        description: 'Dynamic field values from log template',
+        type: [TradeFieldValueDto],
+        required: false,
+    })
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => TradeFieldValueDto)
+    @IsOptional()
+    fieldValues?: TradeFieldValueDto[];
 }
