@@ -28,7 +28,7 @@ export class TradeAccountService {
   }
 
   async create(userId: string, createDto: CreateTradeAccountDto): Promise<TradeAccount> {
-    let encryptedPassword = null;
+    let encryptedPassword: string | null = null;
     if (createDto.mt5Password) {
       encryptedPassword = this.encrypt(createDto.mt5Password);
     }
