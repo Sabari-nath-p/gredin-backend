@@ -1,27 +1,74 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private readonly logger = new Logger(EmailService.name);
+  private readonly transporter: nodemailer.Transporter | null;
+  private readonly fromEmail: string;
+  private readonly isProduction: boolean;
 
   constructor(private configService: ConfigService) {
-    // Configure email transporter (you can customize this based on your email provider)
+    const host =
+      this.configService.get<string>('MAIL_HOST') ||
+      this.configService.get<string>('EMAIL_HOST') ||
+      'smtp.gmail.com';
+
+    const port = Number(
+      this.configService.get<string>('MAIL_PORT') ||
+      this.configService.get<string>('EMAIL_PORT') ||
+      '587',
+    );
+
+    const user =
+      this.configService.get<string>('MAIL_USER') ||
+      this.configService.get<string>('EMAIL_USER') ||
+      '';
+
+    const pass =
+      this.configService.get<string>('MAIL_PASSWORD') ||
+      this.configService.get<string>('EMAIL_PASSWORD') ||
+      '';
+
+    this.fromEmail =
+      this.configService.get<string>('MAIL_FROM') ||
+      this.configService.get<string>('EMAIL_FROM') ||
+      'noreply@mytrade.com';
+
+    this.isProduction =
+      (this.configService.get<string>('NODE_ENV') || '').toLowerCase() === 'production';
+
+    if (!user || !pass) {
+      this.transporter = null;
+      this.logger.warn(
+        'SMTP credentials are missing. Set MAIL_USER and MAIL_PASSWORD (or EMAIL_USER and EMAIL_PASSWORD).',
+      );
+      return;
+    }
+
     this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('EMAIL_HOST', 'smtp.gmail.com'),
-      port: this.configService.get<number>('EMAIL_PORT', 587),
-      secure: false,
-      auth: {
-        user: this.configService.get<string>('EMAIL_USER'),
-        pass: this.configService.get<string>('EMAIL_PASSWORD'),
-      },
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
     });
   }
 
   async sendOtpEmail(email: string, otp: string): Promise<void> {
+    if (!this.transporter) {
+      if (this.isProduction) {
+        throw new ServiceUnavailableException(
+          'Email service is not configured. Please set SMTP credentials.',
+        );
+      }
+
+      this.logger.warn(`DEV MODE - OTP for ${email}: ${otp}`);
+      return;
+    }
+
     const mailOptions = {
-      from: this.configService.get<string>('EMAIL_FROM', 'noreply@mytrade.com'),
+      from: this.fromEmail,
       to: email,
       subject: 'Your MyTrade Login OTP',
       html: `
@@ -39,11 +86,15 @@ export class EmailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log(`OTP sent to ${email}: ${otp}`);
-    } catch (error) {
-      console.error('Error sending email:', error);
-      // In development, we'll just log the OTP
-      console.log(`DEV MODE - OTP for ${email}: ${otp}`);
+      this.logger.log(`OTP email sent to ${email}`);
+    } catch (error: unknown) {
+      this.logger.error(`Error sending OTP email to ${email}`, error instanceof Error ? error.stack : undefined);
+
+      if (this.isProduction) {
+        throw new ServiceUnavailableException('Unable to send OTP email. Please try again later.');
+      }
+
+      this.logger.warn(`DEV MODE - OTP for ${email}: ${otp}`);
     }
   }
 }
