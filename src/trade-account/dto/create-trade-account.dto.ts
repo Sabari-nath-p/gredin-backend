@@ -78,4 +78,19 @@ export class CreateTradeAccountDto {
   @IsEnum(AccountType)
   @IsNotEmpty()
   accountType: AccountType;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  mt5Login?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  mt5Password?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  mt5Server?: string;
 }

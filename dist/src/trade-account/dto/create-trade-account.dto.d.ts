@@ -19,4 +19,7 @@ export declare class CreateTradeAccountDto {
     currencyCode?: string;
     initialBalance: number;
     accountType: AccountType;
+    mt5Login?: string;
+    mt5Password?: string;
+    mt5Server?: string;
 }

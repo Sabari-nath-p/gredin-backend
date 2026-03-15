@@ -29,7 +29,11 @@ export declare class LogTemplateController {
         currencyCode: string;
         initialBalance: import("@prisma/client/runtime/library").Decimal;
         accountType: import(".prisma/client").$Enums.AccountType;
+        mt5Login: string | null;
+        mt5Password: string | null;
+        mt5Server: string | null;
         currentBalance: import("@prisma/client/runtime/library").Decimal;
+        lastSyncTime: Date | null;
         logTemplateId: string | null;
     }>;
     unassignFromAccount(accountId: string, req: any): Promise<void>;

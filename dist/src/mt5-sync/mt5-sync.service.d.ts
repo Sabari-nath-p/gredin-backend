@@ -1,35 +1,16 @@
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateLogTemplateDto } from './dto/create-log-template.dto';
-import { UpdateLogTemplateDto } from './dto/update-log-template.dto';
-import { UserRole } from '@prisma/client';
-export declare class LogTemplateService {
+import { ConfigService } from '@nestjs/config';
+import { LinkMt5Dto } from './dto/link-mt5.dto';
+export declare class Mt5SyncService {
     private prisma;
-    constructor(prisma: PrismaService);
-    private serializeFieldOptions;
-    private deserializeFieldOptions;
-    private mapTemplate;
-    create(userId: string, dto: CreateLogTemplateDto): Promise<any>;
-    findAllByUser(userId: string, page?: number, limit?: number): Promise<{
-        data: any[];
-        meta: {
-            total: number;
-            page: number;
-            limit: number;
-            totalPages: number;
-        };
-    }>;
-    findOne(id: string, userId: string, userRole: UserRole): Promise<any>;
-    update(id: string, userId: string, userRole: UserRole, dto: UpdateLogTemplateDto): Promise<any>;
-    delete(id: string, userId: string, userRole: UserRole): Promise<{
-        description: string | null;
-        name: string;
-        id: string;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-    }>;
-    assignToAccount(templateId: string, accountId: string, userId: string, userRole: UserRole): Promise<{
+    private config;
+    private readonly logger;
+    private readonly algorithm;
+    private readonly fixedKey;
+    constructor(prisma: PrismaService, config: ConfigService);
+    private encrypt;
+    private decrypt;
+    linkAccount(userId: string, accountId: string, dto: LinkMt5Dto): Promise<{
         id: string;
         isActive: boolean;
         createdAt: Date;
@@ -48,7 +29,7 @@ export declare class LogTemplateService {
         lastSyncTime: Date | null;
         logTemplateId: string | null;
     }>;
-    unassignFromAccount(accountId: string, userId: string, userRole: UserRole): Promise<{
+    unlinkAccount(userId: string, accountId: string): Promise<{
         id: string;
         isActive: boolean;
         createdAt: Date;
@@ -67,5 +48,8 @@ export declare class LogTemplateService {
         lastSyncTime: Date | null;
         logTemplateId: string | null;
     }>;
-    getTemplateForAccount(accountId: string, userId: string, userRole: UserRole): Promise<any>;
+    syncAccount(userId: string, accountId: string): Promise<{
+        added: number;
+        message: string;
+    }>;
 }

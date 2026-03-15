@@ -17,12 +17,12 @@ export declare class TradeEntryService {
                     createdAt: Date;
                     updatedAt: Date;
                     fieldOrder: number;
-                    templateId: string;
                     fieldName: string;
                     fieldType: import(".prisma/client").$Enums.FieldType;
                     placeholder: string | null;
                     defaultValue: string | null;
                     fieldOptions: string | null;
+                    templateId: string;
                 };
             } & {
                 id: string;
@@ -51,6 +51,7 @@ export declare class TradeEntryService {
             realisedProfitLoss: Prisma.Decimal | null;
             serviceCharge: Prisma.Decimal;
             notes: string | null;
+            mt5TicketId: string | null;
         })[];
         meta: {
             total: number;

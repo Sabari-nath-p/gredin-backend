@@ -19,6 +19,7 @@ const trade_entry_module_1 = require("./trade-entry/trade-entry.module");
 const log_template_module_1 = require("./log-template/log-template.module");
 const s3_module_1 = require("./s3/s3.module");
 const chat_module_1 = require("./chat/chat.module");
+const mt5_sync_module_1 = require("./mt5-sync/mt5-sync.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -36,6 +37,7 @@ exports.AppModule = AppModule = __decorate([
             log_template_module_1.LogTemplateModule,
             s3_module_1.S3Module,
             chat_module_1.ChatModule,
+            mt5_sync_module_1.Mt5SyncModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

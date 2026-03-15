@@ -1,14 +1,38 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
 import { CreateTradeAccountDto } from './dto/create-trade-account.dto';
 import { UpdateTradeAccountDto } from './dto/update-trade-account.dto';
 import { TradeAccount, UserRole } from '@prisma/client';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class TradeAccountService {
-  constructor(private prisma: PrismaService) { }
+  private readonly algorithm = 'aes-256-cbc';
+  private readonly fixedKey: Buffer;
+
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService
+  ) {
+    const rawKey = this.config.get<string>('JWT_SECRET') || 'default_secret_key_needs_32_bytes_at_least_abcdefg';
+    this.fixedKey = crypto.createHash('sha256').update(String(rawKey)).digest();
+  }
+
+  private encrypt(text: string): string {
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(this.algorithm, this.fixedKey, iv);
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    return `${iv.toString('hex')}:${encrypted}`;
+  }
 
   async create(userId: string, createDto: CreateTradeAccountDto): Promise<TradeAccount> {
+    let encryptedPassword = null;
+    if (createDto.mt5Password) {
+      encryptedPassword = this.encrypt(createDto.mt5Password);
+    }
+
     return this.prisma.tradeAccount.create({
       data: {
         userId,
@@ -17,8 +41,11 @@ export class TradeAccountService {
         marketSegment: createDto.marketSegment,
         currencyCode: createDto.currencyCode || 'USD',
         initialBalance: createDto.initialBalance,
-        currentBalance: createDto.initialBalance, // Set current balance same as initial
+        currentBalance: createDto.initialBalance,
         accountType: createDto.accountType,
+        mt5Login: createDto.mt5Login || null,
+        mt5Password: encryptedPassword,
+        mt5Server: createDto.mt5Server || null,
       },
     });
   }

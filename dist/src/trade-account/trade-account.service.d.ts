@@ -1,30 +1,39 @@
 import { PrismaService } from '../prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
 import { CreateTradeAccountDto } from './dto/create-trade-account.dto';
 import { UpdateTradeAccountDto } from './dto/update-trade-account.dto';
 import { TradeAccount, UserRole } from '@prisma/client';
 export declare class TradeAccountService {
     private prisma;
-    constructor(prisma: PrismaService);
+    private config;
+    private readonly algorithm;
+    private readonly fixedKey;
+    constructor(prisma: PrismaService, config: ConfigService);
+    private encrypt;
     create(userId: string, createDto: CreateTradeAccountDto): Promise<TradeAccount>;
     findAllByUser(userId: string, page?: number, limit?: number): Promise<{
         data: ({
             logTemplate: {
-                name: string;
                 id: string;
+                name: string;
             } | null;
         } & {
             id: string;
-            isActive: boolean;
-            createdAt: Date;
-            updatedAt: Date;
             userId: string;
             accountName: string;
             brokerName: string;
             marketSegment: import(".prisma/client").$Enums.MarketSegment;
             currencyCode: string;
             initialBalance: import("@prisma/client/runtime/library").Decimal;
-            accountType: import(".prisma/client").$Enums.AccountType;
             currentBalance: import("@prisma/client/runtime/library").Decimal;
+            accountType: import(".prisma/client").$Enums.AccountType;
+            isActive: boolean;
+            createdAt: Date;
+            updatedAt: Date;
+            mt5Login: string | null;
+            mt5Password: string | null;
+            mt5Server: string | null;
+            lastSyncTime: Date | null;
             logTemplateId: string | null;
         })[];
         meta: {

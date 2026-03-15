@@ -36,6 +36,9 @@ class CreateTradeAccountDto {
     currencyCode;
     initialBalance;
     accountType;
+    mt5Login;
+    mt5Password;
+    mt5Server;
 }
 exports.CreateTradeAccountDto = CreateTradeAccountDto;
 __decorate([
@@ -104,4 +107,22 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], CreateTradeAccountDto.prototype, "accountType", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateTradeAccountDto.prototype, "mt5Login", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateTradeAccountDto.prototype, "mt5Password", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateTradeAccountDto.prototype, "mt5Server", void 0);
 //# sourceMappingURL=create-trade-account.dto.js.map

@@ -12,13 +12,32 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TradeAccountService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
+const config_1 = require("@nestjs/config");
 const client_1 = require("@prisma/client");
+const crypto = require("crypto");
 let TradeAccountService = class TradeAccountService {
     prisma;
-    constructor(prisma) {
+    config;
+    algorithm = 'aes-256-cbc';
+    fixedKey;
+    constructor(prisma, config) {
         this.prisma = prisma;
+        this.config = config;
+        const rawKey = this.config.get('JWT_SECRET') || 'default_secret_key_needs_32_bytes_at_least_abcdefg';
+        this.fixedKey = crypto.createHash('sha256').update(String(rawKey)).digest();
+    }
+    encrypt(text) {
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv(this.algorithm, this.fixedKey, iv);
+        let encrypted = cipher.update(text, 'utf8', 'hex');
+        encrypted += cipher.final('hex');
+        return `${iv.toString('hex')}:${encrypted}`;
     }
     async create(userId, createDto) {
+        let encryptedPassword = null;
+        if (createDto.mt5Password) {
+            encryptedPassword = this.encrypt(createDto.mt5Password);
+        }
         return this.prisma.tradeAccount.create({
             data: {
                 userId,
@@ -29,6 +48,9 @@ let TradeAccountService = class TradeAccountService {
                 initialBalance: createDto.initialBalance,
                 currentBalance: createDto.initialBalance,
                 accountType: createDto.accountType,
+                mt5Login: createDto.mt5Login || null,
+                mt5Password: encryptedPassword,
+                mt5Server: createDto.mt5Server || null,
             },
         });
     }
@@ -145,6 +167,7 @@ let TradeAccountService = class TradeAccountService {
 exports.TradeAccountService = TradeAccountService;
 exports.TradeAccountService = TradeAccountService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        config_1.ConfigService])
 ], TradeAccountService);
 //# sourceMappingURL=trade-account.service.js.map

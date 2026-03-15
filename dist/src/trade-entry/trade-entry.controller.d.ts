@@ -22,6 +22,7 @@ export declare class TradeEntryController {
         realisedProfitLoss: import("@prisma/client/runtime/library").Decimal | null;
         serviceCharge: import("@prisma/client/runtime/library").Decimal;
         notes: string | null;
+        mt5TicketId: string | null;
     }>;
     findAllByAccount(tradeAccountId: string, req: any, page?: string, limit?: string): Promise<{
         data: ({
@@ -31,12 +32,12 @@ export declare class TradeEntryController {
                     createdAt: Date;
                     updatedAt: Date;
                     fieldOrder: number;
-                    templateId: string;
                     fieldName: string;
                     fieldType: import(".prisma/client").$Enums.FieldType;
                     placeholder: string | null;
                     defaultValue: string | null;
                     fieldOptions: string | null;
+                    templateId: string;
                 };
             } & {
                 id: string;
@@ -65,6 +66,7 @@ export declare class TradeEntryController {
             realisedProfitLoss: import("@prisma/client/runtime/library").Decimal | null;
             serviceCharge: import("@prisma/client/runtime/library").Decimal;
             notes: string | null;
+            mt5TicketId: string | null;
         })[];
         meta: {
             total: number;
@@ -107,6 +109,7 @@ export declare class TradeEntryController {
         realisedProfitLoss: import("@prisma/client/runtime/library").Decimal | null;
         serviceCharge: import("@prisma/client/runtime/library").Decimal;
         notes: string | null;
+        mt5TicketId: string | null;
     }>;
     update(id: string, req: any, updateDto: UpdateTradeEntryDto): Promise<{
         result: import(".prisma/client").$Enums.TradeResult | null;
@@ -125,6 +128,7 @@ export declare class TradeEntryController {
         realisedProfitLoss: import("@prisma/client/runtime/library").Decimal | null;
         serviceCharge: import("@prisma/client/runtime/library").Decimal;
         notes: string | null;
+        mt5TicketId: string | null;
     }>;
     closeTrade(id: string, req: any, closeDto: CloseTradeDto): Promise<{
         result: import(".prisma/client").$Enums.TradeResult | null;
@@ -143,6 +147,7 @@ export declare class TradeEntryController {
         realisedProfitLoss: import("@prisma/client/runtime/library").Decimal | null;
         serviceCharge: import("@prisma/client/runtime/library").Decimal;
         notes: string | null;
+        mt5TicketId: string | null;
     }>;
     delete(id: string, req: any): Promise<void>;
     findAll(req: any): Promise<{
@@ -162,5 +167,6 @@ export declare class TradeEntryController {
         realisedProfitLoss: import("@prisma/client/runtime/library").Decimal | null;
         serviceCharge: import("@prisma/client/runtime/library").Decimal;
         notes: string | null;
+        mt5TicketId: string | null;
     }[]>;
 }

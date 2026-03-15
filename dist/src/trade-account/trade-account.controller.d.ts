@@ -6,38 +6,46 @@ export declare class TradeAccountController {
     constructor(tradeAccountService: TradeAccountService);
     create(req: any, createDto: CreateTradeAccountDto): Promise<{
         id: string;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
         userId: string;
         accountName: string;
         brokerName: string;
         marketSegment: import(".prisma/client").$Enums.MarketSegment;
         currencyCode: string;
         initialBalance: import("@prisma/client/runtime/library").Decimal;
-        accountType: import(".prisma/client").$Enums.AccountType;
         currentBalance: import("@prisma/client/runtime/library").Decimal;
+        accountType: import(".prisma/client").$Enums.AccountType;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        mt5Login: string | null;
+        mt5Password: string | null;
+        mt5Server: string | null;
+        lastSyncTime: Date | null;
         logTemplateId: string | null;
     }>;
     findAllByUser(req: any, page?: string, limit?: string): Promise<{
         data: ({
             logTemplate: {
-                name: string;
                 id: string;
+                name: string;
             } | null;
         } & {
             id: string;
-            isActive: boolean;
-            createdAt: Date;
-            updatedAt: Date;
             userId: string;
             accountName: string;
             brokerName: string;
             marketSegment: import(".prisma/client").$Enums.MarketSegment;
             currencyCode: string;
             initialBalance: import("@prisma/client/runtime/library").Decimal;
-            accountType: import(".prisma/client").$Enums.AccountType;
             currentBalance: import("@prisma/client/runtime/library").Decimal;
+            accountType: import(".prisma/client").$Enums.AccountType;
+            isActive: boolean;
+            createdAt: Date;
+            updatedAt: Date;
+            mt5Login: string | null;
+            mt5Password: string | null;
+            mt5Server: string | null;
+            lastSyncTime: Date | null;
             logTemplateId: string | null;
         })[];
         meta: {
@@ -49,48 +57,60 @@ export declare class TradeAccountController {
     }>;
     findOne(id: string, req: any): Promise<{
         id: string;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
         userId: string;
         accountName: string;
         brokerName: string;
         marketSegment: import(".prisma/client").$Enums.MarketSegment;
         currencyCode: string;
         initialBalance: import("@prisma/client/runtime/library").Decimal;
-        accountType: import(".prisma/client").$Enums.AccountType;
         currentBalance: import("@prisma/client/runtime/library").Decimal;
+        accountType: import(".prisma/client").$Enums.AccountType;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        mt5Login: string | null;
+        mt5Password: string | null;
+        mt5Server: string | null;
+        lastSyncTime: Date | null;
         logTemplateId: string | null;
     }>;
     update(id: string, req: any, updateDto: UpdateTradeAccountDto): Promise<{
         id: string;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
         userId: string;
         accountName: string;
         brokerName: string;
         marketSegment: import(".prisma/client").$Enums.MarketSegment;
         currencyCode: string;
         initialBalance: import("@prisma/client/runtime/library").Decimal;
-        accountType: import(".prisma/client").$Enums.AccountType;
         currentBalance: import("@prisma/client/runtime/library").Decimal;
+        accountType: import(".prisma/client").$Enums.AccountType;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        mt5Login: string | null;
+        mt5Password: string | null;
+        mt5Server: string | null;
+        lastSyncTime: Date | null;
         logTemplateId: string | null;
     }>;
     delete(id: string, req: any): Promise<void>;
     findAll(req: any): Promise<{
         id: string;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
         userId: string;
         accountName: string;
         brokerName: string;
         marketSegment: import(".prisma/client").$Enums.MarketSegment;
         currencyCode: string;
         initialBalance: import("@prisma/client/runtime/library").Decimal;
-        accountType: import(".prisma/client").$Enums.AccountType;
         currentBalance: import("@prisma/client/runtime/library").Decimal;
+        accountType: import(".prisma/client").$Enums.AccountType;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        mt5Login: string | null;
+        mt5Password: string | null;
+        mt5Server: string | null;
+        lastSyncTime: Date | null;
         logTemplateId: string | null;
     }[]>;
     getStats(req: any): Promise<{
