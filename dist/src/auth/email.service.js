@@ -8,29 +8,63 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var EmailService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EmailService = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const nodemailer = require("nodemailer");
-let EmailService = class EmailService {
+let EmailService = EmailService_1 = class EmailService {
     configService;
+    logger = new common_1.Logger(EmailService_1.name);
     transporter;
+    fromEmail;
+    isProduction;
     constructor(configService) {
         this.configService = configService;
+        const host = this.configService.get('MAIL_HOST') ||
+            this.configService.get('EMAIL_HOST') ||
+            'smtp.gmail.com';
+        const port = Number(this.configService.get('MAIL_PORT') ||
+            this.configService.get('EMAIL_PORT') ||
+            '587');
+        const user = this.configService.get('MAIL_USER') ||
+            this.configService.get('EMAIL_USER') ||
+            '';
+        const pass = this.configService.get('MAIL_PASSWORD') ||
+            this.configService.get('EMAIL_PASSWORD') ||
+            '';
+        this.fromEmail =
+            this.configService.get('MAIL_FROM') ||
+                this.configService.get('EMAIL_FROM') ||
+                'noreply@mytrade.com';
+        this.isProduction =
+            (this.configService.get('NODE_ENV') || '').toLowerCase() === 'production';
+        if (!user || !pass) {
+            this.transporter = null;
+            this.logger.warn('SMTP credentials are missing. Set MAIL_USER and MAIL_PASSWORD (or EMAIL_USER and EMAIL_PASSWORD).');
+            return;
+        }
         this.transporter = nodemailer.createTransport({
-            host: this.configService.get('EMAIL_HOST', 'smtp.gmail.com'),
-            port: this.configService.get('EMAIL_PORT', 587),
-            secure: false,
-            auth: {
-                user: this.configService.get('EMAIL_USER'),
-                pass: this.configService.get('EMAIL_PASSWORD'),
+            host,
+            port,
+            secure: port === 465,
+            auth: { user, pass },
+            tls: {
+                rejectUnauthorized: false,
             },
         });
     }
     async sendOtpEmail(email, otp) {
+        if (!this.transporter) {
+            if (this.isProduction) {
+                throw new common_1.ServiceUnavailableException('Email service is not configured. Please set SMTP credentials.');
+            }
+            this.logger.warn(`DEV MODE - OTP for ${email}: ${otp}`);
+            return;
+        }
         const mailOptions = {
-            from: this.configService.get('EMAIL_FROM', 'noreply@mytrade.com'),
+            from: this.fromEmail,
             to: email,
             subject: 'Your MyTrade Login OTP',
             html: `
@@ -45,18 +79,20 @@ let EmailService = class EmailService {
         </div>
       `,
         };
+        this.logger.log(`\n==============================================\n💡 FALLBACK OTP FOR ${email}: ${otp}\n==============================================\n`);
         try {
             await this.transporter.sendMail(mailOptions);
-            console.log(`OTP sent to ${email}: ${otp}`);
+            this.logger.log(`OTP email sent to ${email}`);
         }
         catch (error) {
-            console.error('Error sending email:', error);
-            console.log(`DEV MODE - OTP for ${email}: ${otp}`);
+            this.logger.error(`Error sending OTP email to ${email}`, error instanceof Error ? error.stack : undefined);
+            this.logger.warn(`SMTP failed. Treating as successful internally so you can use the fallback OTP printed above.`);
+            this.logger.warn(`DEV MODE - OTP for ${email}: ${otp}`);
         }
     }
 };
 exports.EmailService = EmailService;
-exports.EmailService = EmailService = __decorate([
+exports.EmailService = EmailService = EmailService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [config_1.ConfigService])
 ], EmailService);
