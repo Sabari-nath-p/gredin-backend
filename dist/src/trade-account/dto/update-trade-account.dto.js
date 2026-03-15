@@ -16,6 +16,9 @@ class UpdateTradeAccountDto {
     accountName;
     brokerName;
     isActive;
+    mt5Login;
+    mt5Password;
+    mt5Server;
 }
 exports.UpdateTradeAccountDto = UpdateTradeAccountDto;
 __decorate([
@@ -52,4 +55,34 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Boolean)
 ], UpdateTradeAccountDto.prototype, "isActive", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'MT5 Login ID for auto-sync',
+        required: false,
+        example: '12345678'
+    }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateTradeAccountDto.prototype, "mt5Login", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'MT5 Password for auto-sync',
+        required: false,
+        example: 'mysecretpass'
+    }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateTradeAccountDto.prototype, "mt5Password", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'MT5 Server name for auto-sync',
+        required: false,
+        example: 'MetaQuotes-Demo'
+    }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateTradeAccountDto.prototype, "mt5Server", void 0);
 //# sourceMappingURL=update-trade-account.dto.js.map

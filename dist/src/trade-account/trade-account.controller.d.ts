@@ -26,8 +26,8 @@ export declare class TradeAccountController {
     findAllByUser(req: any, page?: string, limit?: string): Promise<{
         data: ({
             logTemplate: {
-                id: string;
                 name: string;
+                id: string;
             } | null;
         } & {
             id: string;

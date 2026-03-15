@@ -14,8 +14,8 @@ export declare class TradeAccountService {
     findAllByUser(userId: string, page?: number, limit?: number): Promise<{
         data: ({
             logTemplate: {
-                id: string;
                 name: string;
+                id: string;
             } | null;
         } & {
             id: string;

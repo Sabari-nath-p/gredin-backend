@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LinkMt5Dto = void 0;
 const class_validator_1 = require("class-validator");
+const swagger_1 = require("@nestjs/swagger");
 class LinkMt5Dto {
     mt5Login;
     mt5Password;
@@ -18,16 +19,28 @@ class LinkMt5Dto {
 }
 exports.LinkMt5Dto = LinkMt5Dto;
 __decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'MT5 Login ID',
+        example: '12345678'
+    }),
     (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], LinkMt5Dto.prototype, "mt5Login", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'MT5 Password',
+        example: 'mysecretpass'
+    }),
     (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], LinkMt5Dto.prototype, "mt5Password", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'MT5 Server Name',
+        example: 'MetaQuotes-Demo'
+    }),
     (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)

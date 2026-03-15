@@ -108,19 +108,31 @@ __decorate([
     __metadata("design:type", String)
 ], CreateTradeAccountDto.prototype, "accountType", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ required: false }),
+    (0, swagger_1.ApiProperty)({
+        description: 'MT5 Login ID for auto-sync',
+        required: false,
+        example: '12345678'
+    }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateTradeAccountDto.prototype, "mt5Login", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ required: false }),
+    (0, swagger_1.ApiProperty)({
+        description: 'MT5 Password for auto-sync',
+        required: false,
+        example: 'mysecretpass'
+    }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateTradeAccountDto.prototype, "mt5Password", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ required: false }),
+    (0, swagger_1.ApiProperty)({
+        description: 'MT5 Server name for auto-sync',
+        required: false,
+        example: 'MetaQuotes-Demo'
+    }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)

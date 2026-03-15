@@ -79,17 +79,29 @@ export class CreateTradeAccountDto {
   @IsNotEmpty()
   accountType: AccountType;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ 
+    description: 'MT5 Login ID for auto-sync',
+    required: false,
+    example: '12345678'
+  })
   @IsString()
   @IsOptional()
   mt5Login?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ 
+    description: 'MT5 Password for auto-sync',
+    required: false,
+    example: 'mysecretpass'
+  })
   @IsString()
   @IsOptional()
   mt5Password?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ 
+    description: 'MT5 Server name for auto-sync',
+    required: false,
+    example: 'MetaQuotes-Demo'
+  })
   @IsString()
   @IsOptional()
   mt5Server?: string;
