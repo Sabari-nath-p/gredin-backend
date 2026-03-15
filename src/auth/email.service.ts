@@ -52,6 +52,10 @@ export class EmailService {
       port,
       secure: port === 465,
       auth: { user, pass },
+      tls: 
+        {
+           rejectUnauthorized: false,
+         },
     });
   }
 
