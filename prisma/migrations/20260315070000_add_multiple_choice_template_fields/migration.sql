@@ -1,0 +1,3 @@
+ALTER TABLE `LogTemplateField`
+    ADD COLUMN `fieldOptions` TEXT NULL,
+    MODIFY `fieldType` ENUM('TEXT', 'LONG_TEXT', 'CHECKBOX', 'IMAGE', 'MULTIPLE_CHOICE') NOT NULL;

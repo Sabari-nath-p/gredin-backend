@@ -2,7 +2,8 @@ export declare enum FieldType {
     TEXT = "TEXT",
     LONG_TEXT = "LONG_TEXT",
     CHECKBOX = "CHECKBOX",
-    IMAGE = "IMAGE"
+    IMAGE = "IMAGE",
+    MULTIPLE_CHOICE = "MULTIPLE_CHOICE"
 }
 export declare class CreateTemplateFieldDto {
     fieldName: string;
@@ -10,6 +11,7 @@ export declare class CreateTemplateFieldDto {
     fieldOrder: number;
     placeholder?: string;
     defaultValue?: string;
+    fieldOptions?: string[];
 }
 export declare class CreateLogTemplateDto {
     name: string;

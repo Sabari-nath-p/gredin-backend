@@ -64,7 +64,14 @@ let AgentService = AgentService_1 = class AgentService {
                 answer: 'The AI assistant is not configured. Please set the GEMINI_API_KEY environment variable.',
             };
         }
-        const decision = await this.decideAction(userId, message, tradeAccountId, conversationHistory);
+        let decision;
+        try {
+            decision = await this.decideAction(userId, message, tradeAccountId, conversationHistory);
+        }
+        catch (err) {
+            this.logger.error(`Agent decision failed: ${err.message}`);
+            return { answer: this.friendlyError(err.message) };
+        }
         if (!decision.needsData) {
             return { answer: decision.directAnswer || 'I could not generate a response.' };
         }
@@ -87,9 +94,30 @@ let AgentService = AgentService_1 = class AgentService {
             catch (retryErr) {
                 return { answer: `I tried to query your data but encountered an error. Could you rephrase your question?\n\nError: ${retryErr.message}` };
             }
-            return this.synthesizeAnswer(message, retryDecision.sqlQuery, sqlResult, conversationHistory);
+            try {
+                return await this.synthesizeAnswer(message, retryDecision.sqlQuery, sqlResult, conversationHistory);
+            }
+            catch (synthErr) {
+                this.logger.error(`Synthesis failed after retry: ${synthErr.message}`);
+                return { answer: this.friendlyError(synthErr.message), sqlQuery: retryDecision.sqlQuery, sqlResult };
+            }
         }
-        return this.synthesizeAnswer(message, sqlQuery, sqlResult, conversationHistory);
+        try {
+            return await this.synthesizeAnswer(message, sqlQuery, sqlResult, conversationHistory);
+        }
+        catch (err) {
+            this.logger.error(`Synthesis failed: ${err.message}`);
+            return { answer: this.friendlyError(err.message), sqlQuery, sqlResult };
+        }
+    }
+    friendlyError(msg) {
+        if (msg.includes('RATE_LIMITED')) {
+            return '⏳ The AI service is temporarily busy due to rate limits. Please wait a minute and try again.';
+        }
+        if (msg.includes('AUTH_FAILED')) {
+            return '🔑 The AI service is not properly configured. Please contact the administrator.';
+        }
+        return '❌ Something went wrong while processing your request. Please try again in a moment.';
     }
     async decideAction(userId, message, tradeAccountId, history) {
         const accountFilter = tradeAccountId
@@ -224,6 +252,12 @@ ${historyXml}
             if (!response.ok) {
                 const errBody = await response.text();
                 this.logger.error(`Gemini API error ${response.status}: ${errBody}`);
+                if (response.status === 429) {
+                    throw new Error('RATE_LIMITED: The AI service is temporarily busy. Please wait a moment and try again.');
+                }
+                if (response.status === 403) {
+                    throw new Error('AUTH_FAILED: The AI API key is invalid or expired. Please check configuration.');
+                }
                 throw new Error(`Gemini API returned ${response.status}`);
             }
             const data = await response.json();

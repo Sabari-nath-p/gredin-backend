@@ -5,52 +5,12 @@ import { UserRole } from '@prisma/client';
 export declare class LogTemplateService {
     private prisma;
     constructor(prisma: PrismaService);
-    create(userId: string, dto: CreateLogTemplateDto): Promise<{
-        fields: {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            fieldOrder: number;
-            templateId: string;
-            fieldName: string;
-            fieldType: import(".prisma/client").$Enums.FieldType;
-            placeholder: string | null;
-            defaultValue: string | null;
-        }[];
-    } & {
-        description: string | null;
-        name: string;
-        id: string;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-    }>;
+    private serializeFieldOptions;
+    private deserializeFieldOptions;
+    private mapTemplate;
+    create(userId: string, dto: CreateLogTemplateDto): Promise<any>;
     findAllByUser(userId: string, page?: number, limit?: number): Promise<{
-        data: ({
-            _count: {
-                accounts: number;
-            };
-            fields: {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                fieldOrder: number;
-                templateId: string;
-                fieldName: string;
-                fieldType: import(".prisma/client").$Enums.FieldType;
-                placeholder: string | null;
-                defaultValue: string | null;
-            }[];
-        } & {
-            description: string | null;
-            name: string;
-            id: string;
-            isActive: boolean;
-            createdAt: Date;
-            updatedAt: Date;
-            userId: string;
-        })[];
+        data: any[];
         meta: {
             total: number;
             page: number;
@@ -58,56 +18,8 @@ export declare class LogTemplateService {
             totalPages: number;
         };
     }>;
-    findOne(id: string, userId: string, userRole: UserRole): Promise<{
-        fields: {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            fieldOrder: number;
-            templateId: string;
-            fieldName: string;
-            fieldType: import(".prisma/client").$Enums.FieldType;
-            placeholder: string | null;
-            defaultValue: string | null;
-        }[];
-        accounts: {
-            id: string;
-            accountName: string;
-        }[];
-    } & {
-        description: string | null;
-        name: string;
-        id: string;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-    }>;
-    update(id: string, userId: string, userRole: UserRole, dto: UpdateLogTemplateDto): Promise<{
-        fields: {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            fieldOrder: number;
-            templateId: string;
-            fieldName: string;
-            fieldType: import(".prisma/client").$Enums.FieldType;
-            placeholder: string | null;
-            defaultValue: string | null;
-        }[];
-        accounts: {
-            id: string;
-            accountName: string;
-        }[];
-    } & {
-        description: string | null;
-        name: string;
-        id: string;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-    }>;
+    findOne(id: string, userId: string, userRole: UserRole): Promise<any>;
+    update(id: string, userId: string, userRole: UserRole, dto: UpdateLogTemplateDto): Promise<any>;
     delete(id: string, userId: string, userRole: UserRole): Promise<{
         description: string | null;
         name: string;
@@ -147,25 +59,5 @@ export declare class LogTemplateService {
         currentBalance: import("@prisma/client/runtime/library").Decimal;
         logTemplateId: string | null;
     }>;
-    getTemplateForAccount(accountId: string, userId: string, userRole: UserRole): Promise<({
-        fields: {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            fieldOrder: number;
-            templateId: string;
-            fieldName: string;
-            fieldType: import(".prisma/client").$Enums.FieldType;
-            placeholder: string | null;
-            defaultValue: string | null;
-        }[];
-    } & {
-        description: string | null;
-        name: string;
-        id: string;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-    }) | null>;
+    getTemplateForAccount(accountId: string, userId: string, userRole: UserRole): Promise<any>;
 }

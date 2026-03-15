@@ -9,10 +9,41 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdateTradeEntryDto = void 0;
+exports.UpdateTradeEntryDto = exports.UpdateTradeFieldValueDto = void 0;
 const swagger_1 = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
+class UpdateTradeFieldValueDto {
+    fieldId;
+    textValue;
+    booleanValue;
+    imageUrl;
+}
+exports.UpdateTradeFieldValueDto = UpdateTradeFieldValueDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Template field ID' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], UpdateTradeFieldValueDto.prototype, "fieldId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Text value', required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateTradeFieldValueDto.prototype, "textValue", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Boolean value', required: false }),
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], UpdateTradeFieldValueDto.prototype, "booleanValue", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Image URL', required: false }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateTradeFieldValueDto.prototype, "imageUrl", void 0);
 class UpdateTradeEntryDto {
     entryDateTime;
     instrument;
@@ -21,6 +52,7 @@ class UpdateTradeEntryDto {
     stopLossAmount;
     takeProfitAmount;
     notes;
+    fieldValues;
 }
 exports.UpdateTradeEntryDto = UpdateTradeEntryDto;
 __decorate([
@@ -101,4 +133,16 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], UpdateTradeEntryDto.prototype, "notes", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Template field values to upsert for this trade',
+        type: [UpdateTradeFieldValueDto],
+        required: false,
+    }),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => UpdateTradeFieldValueDto),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], UpdateTradeEntryDto.prototype, "fieldValues", void 0);
 //# sourceMappingURL=update-trade-entry.dto.js.map

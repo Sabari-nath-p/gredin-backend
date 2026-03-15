@@ -1,3 +1,9 @@
+export declare class UpdateTradeFieldValueDto {
+    fieldId: string;
+    textValue?: string;
+    booleanValue?: boolean;
+    imageUrl?: string;
+}
 export declare class UpdateTradeEntryDto {
     entryDateTime?: string;
     instrument?: string;
@@ -6,4 +12,5 @@ export declare class UpdateTradeEntryDto {
     stopLossAmount?: number;
     takeProfitAmount?: number;
     notes?: string;
+    fieldValues?: UpdateTradeFieldValueDto[];
 }

@@ -23,19 +23,19 @@ let ChatController = class ChatController {
         this.chat = chat;
     }
     getSessions(req, page, limit) {
-        return this.chat.getSessions(req.user.id, page, limit);
+        return this.chat.getSessions(req.user.userId, page, limit);
     }
     getSession(req, id) {
-        return this.chat.getSession(req.user.id, id);
+        return this.chat.getSession(req.user.userId, id);
     }
     sendMessage(req, dto) {
-        return this.chat.sendMessage(req.user.id, dto);
+        return this.chat.sendMessage(req.user.userId, dto);
     }
     updateTitle(req, id, title) {
-        return this.chat.updateSessionTitle(req.user.id, id, title);
+        return this.chat.updateSessionTitle(req.user.userId, id, title);
     }
     deleteSession(req, id) {
-        return this.chat.deleteSession(req.user.id, id);
+        return this.chat.deleteSession(req.user.userId, id);
     }
 };
 exports.ChatController = ChatController;

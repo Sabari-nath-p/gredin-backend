@@ -141,6 +141,7 @@ enum FieldType {
   LONG_TEXT
   CHECKBOX
   IMAGE
+  MULTIPLE_CHOICE
 }
 
 model LogTemplate {
@@ -167,6 +168,7 @@ model LogTemplateField {
   fieldOrder    Int
   placeholder   String?
   defaultValue  String?
+  fieldOptions  String?           @db.Text
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   values        TradeFieldValue[]

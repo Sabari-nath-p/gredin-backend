@@ -1,6 +1,28 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNumber, IsDateString, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsDateString, Min, IsArray, ValidateNested, IsBoolean, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class UpdateTradeFieldValueDto {
+    @ApiProperty({ description: 'Template field ID' })
+    @IsString()
+    @IsNotEmpty()
+    fieldId: string;
+
+    @ApiProperty({ description: 'Text value', required: false })
+    @IsString()
+    @IsOptional()
+    textValue?: string;
+
+    @ApiProperty({ description: 'Boolean value', required: false })
+    @IsBoolean()
+    @IsOptional()
+    booleanValue?: boolean;
+
+    @ApiProperty({ description: 'Image URL', required: false })
+    @IsString()
+    @IsOptional()
+    imageUrl?: string;
+}
 
 export class UpdateTradeEntryDto {
     @ApiProperty({
@@ -73,4 +95,15 @@ export class UpdateTradeEntryDto {
     @IsString()
     @IsOptional()
     notes?: string;
+
+    @ApiProperty({
+        description: 'Template field values to upsert for this trade',
+        type: [UpdateTradeFieldValueDto],
+        required: false,
+    })
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => UpdateTradeFieldValueDto)
+    @IsOptional()
+    fieldValues?: UpdateTradeFieldValueDto[];
 }

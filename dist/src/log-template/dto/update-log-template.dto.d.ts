@@ -6,6 +6,7 @@ export declare class UpdateTemplateFieldDto {
     fieldOrder?: number;
     placeholder?: string;
     defaultValue?: string;
+    fieldOptions?: string[];
 }
 export declare class UpdateLogTemplateDto {
     name?: string;

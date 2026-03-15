@@ -41,7 +41,7 @@ export class TradeEntryController {
     - If CLOSED, must include: result, realisedProfitLoss
     - Account balance is automatically updated for CLOSED trades:
       * PROFIT: adds (realisedProfitLoss - serviceCharge)
-      * LOSS: subtracts (stopLossAmount + serviceCharge)
+            * LOSS: subtracts (realisedProfitLoss + serviceCharge)
       * BREAK_EVEN: subtracts serviceCharge only`,
     })
     @ApiResponse({ status: 201, description: 'Trade entry created successfully' })
@@ -132,7 +132,7 @@ export class TradeEntryController {
         description: `Close an OPEN trade and update account balance automatically.
     Balance changes:
     - PROFIT: adds (realisedProfitLoss - serviceCharge) to account
-    - LOSS: subtracts (stopLossAmount + serviceCharge) from account
+    - LOSS: subtracts (realisedProfitLoss + serviceCharge) from account
     - BREAK_EVEN: subtracts serviceCharge only from account`,
     })
     @ApiParam({ name: 'id', description: 'Trade entry ID' })

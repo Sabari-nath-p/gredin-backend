@@ -16,6 +16,7 @@ export declare class AgentService {
         role: string;
         content: string;
     }[]): Promise<AgentResult>;
+    private friendlyError;
     private decideAction;
     private retrySqlGeneration;
     private synthesizeAnswer;

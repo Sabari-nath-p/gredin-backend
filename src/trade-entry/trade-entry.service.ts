@@ -15,8 +15,32 @@ import { TradeEntry, UserRole, Prisma } from '@prisma/client';
 export class TradeEntryService {
     constructor(private prisma: PrismaService) { }
 
+    private normalizeRealisedProfitLoss(result: TradeResult, realisedProfitLoss: number): number {
+        if (result === TradeResult.BREAK_EVEN) {
+            return 0;
+        }
+
+        return Math.abs(realisedProfitLoss);
+    }
+
+    private getBalanceChange(
+        result: TradeResult,
+        realisedProfitLoss: number,
+        serviceCharge: number,
+    ): number {
+        const normalizedProfitLoss = this.normalizeRealisedProfitLoss(result, realisedProfitLoss);
+
+        switch (result) {
+            case TradeResult.PROFIT:
+                return normalizedProfitLoss - serviceCharge;
+            case TradeResult.LOSS:
+                return -(normalizedProfitLoss + serviceCharge);
+            case TradeResult.BREAK_EVEN:
+                return -serviceCharge;
+        }
+    }
+
     async create(userId: string, createDto: CreateTradeEntryDto): Promise<TradeEntry> {
-        // Verify trade account belongs to user
         const tradeAccount = await this.prisma.tradeAccount.findFirst({
             where: {
                 id: createDto.tradeAccountId,
@@ -34,20 +58,22 @@ export class TradeEntryService {
 
         const status = createDto.status || TradeStatus.OPEN;
 
-        // If creating with CLOSED status, validate required fields
         if (status === TradeStatus.CLOSED) {
             if (!createDto.result) {
                 throw new BadRequestException('Result is required when creating a closed trade');
             }
+
             if (createDto.realisedProfitLoss === undefined || createDto.realisedProfitLoss === null) {
-                throw new BadRequestException(
-                    'Realised profit/loss is required when creating a closed trade',
-                );
+                throw new BadRequestException('Realised profit/loss is required when creating a closed trade');
             }
         }
 
-        // Use transaction to ensure data consistency
         return await this.prisma.$transaction(async (prisma) => {
+            const normalizedRealisedProfitLoss =
+                status === TradeStatus.CLOSED && createDto.result
+                    ? this.normalizeRealisedProfitLoss(createDto.result, createDto.realisedProfitLoss!)
+                    : createDto.realisedProfitLoss;
+
             const tradeEntry = await prisma.tradeEntry.create({
                 data: {
                     tradeAccountId: createDto.tradeAccountId,
@@ -60,13 +86,12 @@ export class TradeEntryService {
                     takeProfitAmount: createDto.takeProfitAmount,
                     status,
                     result: createDto.result,
-                    realisedProfitLoss: createDto.realisedProfitLoss,
+                    realisedProfitLoss: normalizedRealisedProfitLoss,
                     serviceCharge: createDto.serviceCharge || 0,
                     notes: createDto.notes,
                 },
             });
 
-            // Save dynamic field values if provided
             if (createDto.fieldValues && createDto.fieldValues.length > 0) {
                 for (const fv of createDto.fieldValues) {
                     await prisma.tradeFieldValue.create({
@@ -81,15 +106,13 @@ export class TradeEntryService {
                 }
             }
 
-            // If trade is closed, update account balance
             if (status === TradeStatus.CLOSED) {
                 await this.updateAccountBalance(
                     prisma,
                     createDto.tradeAccountId,
                     createDto.result!,
-                    createDto.realisedProfitLoss!,
+                    normalizedRealisedProfitLoss!,
                     createDto.serviceCharge || 0,
-                    createDto.stopLossAmount,
                 );
             }
 
@@ -104,7 +127,6 @@ export class TradeEntryService {
         page = 1,
         limit = 20,
     ) {
-        // Verify access to trade account
         const tradeAccount = await this.prisma.tradeAccount.findUnique({
             where: { id: tradeAccountId },
         });
@@ -194,14 +216,69 @@ export class TradeEntryService {
             throw new ForbiddenException('You do not have access to this trade entry');
         }
 
-        // Only allow updates on OPEN trades
-        if (tradeEntry.status === TradeStatus.CLOSED) {
-            throw new BadRequestException('Cannot update a closed trade');
+        const { fieldValues, ...entryUpdateData } = updateDto as UpdateTradeEntryDto & {
+            fieldValues?: { fieldId: string; textValue?: string; booleanValue?: boolean; imageUrl?: string }[];
+        };
+
+        const hasCoreTradeChanges = [
+            entryUpdateData.entryDateTime,
+            entryUpdateData.instrument,
+            entryUpdateData.entryPrice,
+            entryUpdateData.positionSize,
+            entryUpdateData.stopLossAmount,
+            entryUpdateData.takeProfitAmount,
+        ].some((value) => value !== undefined);
+
+        if (tradeEntry.status === TradeStatus.CLOSED && hasCoreTradeChanges) {
+            throw new BadRequestException('Cannot update core trade details after the trade is closed');
         }
 
-        return this.prisma.tradeEntry.update({
-            where: { id },
-            data: updateDto,
+        return this.prisma.$transaction(async (prisma) => {
+            const updatedTrade = await prisma.tradeEntry.update({
+                where: { id },
+                data: {
+                    ...entryUpdateData,
+                    ...(entryUpdateData.entryDateTime
+                        ? { entryDateTime: new Date(entryUpdateData.entryDateTime) }
+                        : {}),
+                },
+            });
+
+            if (fieldValues && fieldValues.length > 0) {
+                for (const fieldValue of fieldValues) {
+                    await prisma.tradeFieldValue.upsert({
+                        where: {
+                            tradeEntryId_fieldId: {
+                                tradeEntryId: id,
+                                fieldId: fieldValue.fieldId,
+                            },
+                        },
+                        update: {
+                            textValue: fieldValue.textValue ?? null,
+                            booleanValue: fieldValue.booleanValue ?? null,
+                            imageUrl: fieldValue.imageUrl ?? null,
+                        },
+                        create: {
+                            tradeEntryId: id,
+                            fieldId: fieldValue.fieldId,
+                            textValue: fieldValue.textValue ?? null,
+                            booleanValue: fieldValue.booleanValue ?? null,
+                            imageUrl: fieldValue.imageUrl ?? null,
+                        },
+                    });
+                }
+            }
+
+            return prisma.tradeEntry.findUniqueOrThrow({
+                where: { id: updatedTrade.id },
+                include: {
+                    fieldValues: {
+                        include: {
+                            field: true,
+                        },
+                    },
+                },
+            });
         });
     }
 
@@ -232,13 +309,18 @@ export class TradeEntryService {
 
         // Use transaction to ensure data consistency
         return await this.prisma.$transaction(async (prisma) => {
+            const normalizedRealisedProfitLoss = this.normalizeRealisedProfitLoss(
+                closeDto.result,
+                closeDto.realisedProfitLoss,
+            );
+
             // Update trade entry
             const updatedTrade = await prisma.tradeEntry.update({
                 where: { id },
                 data: {
                     status: TradeStatus.CLOSED,
                     result: closeDto.result,
-                    realisedProfitLoss: closeDto.realisedProfitLoss,
+                    realisedProfitLoss: normalizedRealisedProfitLoss,
                     serviceCharge: closeDto.serviceCharge || tradeEntry.serviceCharge,
                     notes: closeDto.notes || tradeEntry.notes,
                 },
@@ -275,9 +357,8 @@ export class TradeEntryService {
                 prisma,
                 tradeEntry.tradeAccountId,
                 closeDto.result,
-                closeDto.realisedProfitLoss,
+                normalizedRealisedProfitLoss,
                 closeDto.serviceCharge || tradeEntry.serviceCharge.toNumber(),
-                tradeEntry.stopLossAmount.toNumber(),
             );
 
             return updatedTrade;
@@ -309,7 +390,6 @@ export class TradeEntryService {
                     tradeEntry.result!,
                     tradeEntry.realisedProfitLoss!.toNumber(),
                     tradeEntry.serviceCharge.toNumber(),
-                    tradeEntry.stopLossAmount.toNumber(),
                 );
 
                 // Delete the trade entry
@@ -391,12 +471,12 @@ export class TradeEntryService {
         let largestLoss = 0;
 
         for (const trade of closedTradeEntries) {
-            const pl = trade.realisedProfitLoss ? trade.realisedProfitLoss.toNumber() : 0;
+            const pl = trade.realisedProfitLoss ? Math.abs(trade.realisedProfitLoss.toNumber()) : 0;
             if (trade.result === TradeResult.PROFIT) {
                 totalProfit += pl;
                 if (pl > largestWin) largestWin = pl;
             } else if (trade.result === TradeResult.LOSS) {
-                const lossAmount = trade.stopLossAmount.toNumber() + trade.serviceCharge.toNumber();
+                const lossAmount = pl + trade.serviceCharge.toNumber();
                 totalLoss += lossAmount;
                 if (lossAmount > largestLoss) largestLoss = lossAmount;
             }
@@ -432,7 +512,6 @@ export class TradeEntryService {
         result: TradeResult,
         realisedProfitLoss: number,
         serviceCharge: number,
-        stopLossAmount: number,
     ): Promise<void> {
         const tradeAccount = await prisma.tradeAccount.findUnique({
             where: { id: tradeAccountId },
@@ -442,24 +521,7 @@ export class TradeEntryService {
             throw new NotFoundException('Trade account not found');
         }
 
-        let balanceChange = 0;
-
-        switch (result) {
-            case TradeResult.PROFIT:
-                // Add profit minus service charge
-                balanceChange = realisedProfitLoss - serviceCharge;
-                break;
-
-            case TradeResult.LOSS:
-                // Subtract stop loss and service charge
-                balanceChange = -(stopLossAmount + serviceCharge);
-                break;
-
-            case TradeResult.BREAK_EVEN:
-                // Only subtract service charge
-                balanceChange = -serviceCharge;
-                break;
-        }
+        const balanceChange = this.getBalanceChange(result, realisedProfitLoss, serviceCharge);
 
         const newBalance = tradeAccount.currentBalance.toNumber() + balanceChange;
 
@@ -475,7 +537,6 @@ export class TradeEntryService {
         result: TradeResult,
         realisedProfitLoss: number,
         serviceCharge: number,
-        stopLossAmount: number,
     ): Promise<void> {
         const tradeAccount = await prisma.tradeAccount.findUnique({
             where: { id: tradeAccountId },
@@ -485,24 +546,7 @@ export class TradeEntryService {
             throw new NotFoundException('Trade account not found');
         }
 
-        let balanceChange = 0;
-
-        switch (result) {
-            case TradeResult.PROFIT:
-                // Reverse: Subtract profit and add back service charge
-                balanceChange = -(realisedProfitLoss - serviceCharge);
-                break;
-
-            case TradeResult.LOSS:
-                // Reverse: Add back stop loss and service charge
-                balanceChange = stopLossAmount + serviceCharge;
-                break;
-
-            case TradeResult.BREAK_EVEN:
-                // Reverse: Add back service charge
-                balanceChange = serviceCharge;
-                break;
-        }
+        const balanceChange = -this.getBalanceChange(result, realisedProfitLoss, serviceCharge);
 
         const newBalance = tradeAccount.currentBalance.toNumber() + balanceChange;
 

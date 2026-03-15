@@ -6,6 +6,8 @@ import { TradeEntry, UserRole, Prisma } from '@prisma/client';
 export declare class TradeEntryService {
     private prisma;
     constructor(prisma: PrismaService);
+    private normalizeRealisedProfitLoss;
+    private getBalanceChange;
     create(userId: string, createDto: CreateTradeEntryDto): Promise<TradeEntry>;
     findAllByAccount(tradeAccountId: string, userId: string, userRole: UserRole, page?: number, limit?: number): Promise<{
         data: ({
@@ -20,6 +22,7 @@ export declare class TradeEntryService {
                     fieldType: import(".prisma/client").$Enums.FieldType;
                     placeholder: string | null;
                     defaultValue: string | null;
+                    fieldOptions: string | null;
                 };
             } & {
                 id: string;

@@ -21,6 +21,7 @@ class UpdateTemplateFieldDto {
     fieldOrder;
     placeholder;
     defaultValue;
+    fieldOptions;
 }
 exports.UpdateTemplateFieldDto = UpdateTemplateFieldDto;
 __decorate([
@@ -61,6 +62,15 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], UpdateTemplateFieldDto.prototype, "defaultValue", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Choice options for MULTIPLE_CHOICE fields', type: [String], required: false }),
+    (0, class_validator_1.ValidateIf)((o) => o.fieldType === create_log_template_dto_1.FieldType.MULTIPLE_CHOICE),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ArrayNotEmpty)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], UpdateTemplateFieldDto.prototype, "fieldOptions", void 0);
 class UpdateLogTemplateDto {
     name;
     description;

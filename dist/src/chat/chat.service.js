@@ -94,7 +94,13 @@ let ChatService = class ChatService {
             role: m.role === 'USER' ? 'user' : 'assistant',
             content: m.content,
         }));
-        const result = await this.agent.process(userId, dto.message, tradeAccountId, history);
+        let result;
+        try {
+            result = await this.agent.process(userId, dto.message, tradeAccountId, history);
+        }
+        catch (err) {
+            result = { answer: '❌ Sorry, I encountered an unexpected error. Please try again in a moment.' };
+        }
         const assistantMsg = await this.prisma.chatMessage.create({
             data: {
                 sessionId: session.id,

@@ -19,6 +19,7 @@ var FieldType;
     FieldType["LONG_TEXT"] = "LONG_TEXT";
     FieldType["CHECKBOX"] = "CHECKBOX";
     FieldType["IMAGE"] = "IMAGE";
+    FieldType["MULTIPLE_CHOICE"] = "MULTIPLE_CHOICE";
 })(FieldType || (exports.FieldType = FieldType = {}));
 class CreateTemplateFieldDto {
     fieldName;
@@ -26,6 +27,7 @@ class CreateTemplateFieldDto {
     fieldOrder;
     placeholder;
     defaultValue;
+    fieldOptions;
 }
 exports.CreateTemplateFieldDto = CreateTemplateFieldDto;
 __decorate([
@@ -59,6 +61,20 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateTemplateFieldDto.prototype, "defaultValue", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Choice options for MULTIPLE_CHOICE fields',
+        required: false,
+        type: [String],
+        example: ['A+ setup', 'B setup', 'C setup'],
+    }),
+    (0, class_validator_1.ValidateIf)((o) => o.fieldType === FieldType.MULTIPLE_CHOICE),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ArrayNotEmpty)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CreateTemplateFieldDto.prototype, "fieldOptions", void 0);
 class CreateLogTemplateDto {
     name;
     description;

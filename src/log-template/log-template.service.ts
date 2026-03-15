@@ -12,8 +12,43 @@ import { UserRole } from '@prisma/client';
 export class LogTemplateService {
     constructor(private prisma: PrismaService) {}
 
+    private serializeFieldOptions(fieldOptions?: string[]) {
+        if (!fieldOptions || fieldOptions.length === 0) {
+            return null;
+        }
+
+        return JSON.stringify(fieldOptions);
+    }
+
+    private deserializeFieldOptions(fieldOptions?: string | null): string[] {
+        if (!fieldOptions) {
+            return [];
+        }
+
+        try {
+            const parsed = JSON.parse(fieldOptions);
+            return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : [];
+        } catch {
+            return [];
+        }
+    }
+
+    private mapTemplate(template: any) {
+        if (!template) {
+            return template;
+        }
+
+        return {
+            ...template,
+            fields: (template.fields || []).map((field: any) => ({
+                ...field,
+                fieldOptions: this.deserializeFieldOptions(field.fieldOptions),
+            })),
+        };
+    }
+
     async create(userId: string, dto: CreateLogTemplateDto) {
-        return this.prisma.logTemplate.create({
+        const template = await this.prisma.logTemplate.create({
             data: {
                 userId,
                 name: dto.name,
@@ -25,11 +60,14 @@ export class LogTemplateService {
                         fieldOrder: f.fieldOrder,
                         placeholder: f.placeholder,
                         defaultValue: f.defaultValue,
+                        fieldOptions: this.serializeFieldOptions(f.fieldOptions),
                     })),
                 },
             },
             include: { fields: { orderBy: { fieldOrder: 'asc' } } },
         });
+
+        return this.mapTemplate(template);
     }
 
     async findAllByUser(
@@ -49,7 +87,7 @@ export class LogTemplateService {
             this.prisma.logTemplate.count({ where: { userId } }),
         ]);
         return {
-            data,
+            data: data.map((template) => this.mapTemplate(template)),
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
     }
@@ -68,7 +106,7 @@ export class LogTemplateService {
             throw new ForbiddenException('You do not have access to this template');
         }
 
-        return template;
+        return this.mapTemplate(template);
     }
 
     async update(id: string, userId: string, userRole: UserRole, dto: UpdateLogTemplateDto) {
@@ -106,6 +144,7 @@ export class LogTemplateService {
                                 fieldOrder: f.fieldOrder,
                                 placeholder: f.placeholder,
                                 defaultValue: f.defaultValue,
+                                fieldOptions: this.serializeFieldOptions(f.fieldOptions),
                             },
                         });
                     } else {
@@ -117,6 +156,7 @@ export class LogTemplateService {
                                 fieldOrder: f.fieldOrder ?? 0,
                                 placeholder: f.placeholder,
                                 defaultValue: f.defaultValue,
+                                fieldOptions: this.serializeFieldOptions(f.fieldOptions),
                             },
                         });
                     }
@@ -213,6 +253,6 @@ export class LogTemplateService {
             throw new ForbiddenException('Not your account');
         }
 
-        return account.logTemplate;
+        return this.mapTemplate(account.logTemplate);
     }
 }

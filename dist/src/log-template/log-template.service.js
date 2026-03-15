@@ -18,8 +18,38 @@ let LogTemplateService = class LogTemplateService {
     constructor(prisma) {
         this.prisma = prisma;
     }
+    serializeFieldOptions(fieldOptions) {
+        if (!fieldOptions || fieldOptions.length === 0) {
+            return null;
+        }
+        return JSON.stringify(fieldOptions);
+    }
+    deserializeFieldOptions(fieldOptions) {
+        if (!fieldOptions) {
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(fieldOptions);
+            return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : [];
+        }
+        catch {
+            return [];
+        }
+    }
+    mapTemplate(template) {
+        if (!template) {
+            return template;
+        }
+        return {
+            ...template,
+            fields: (template.fields || []).map((field) => ({
+                ...field,
+                fieldOptions: this.deserializeFieldOptions(field.fieldOptions),
+            })),
+        };
+    }
     async create(userId, dto) {
-        return this.prisma.logTemplate.create({
+        const template = await this.prisma.logTemplate.create({
             data: {
                 userId,
                 name: dto.name,
@@ -31,11 +61,13 @@ let LogTemplateService = class LogTemplateService {
                         fieldOrder: f.fieldOrder,
                         placeholder: f.placeholder,
                         defaultValue: f.defaultValue,
+                        fieldOptions: this.serializeFieldOptions(f.fieldOptions),
                     })),
                 },
             },
             include: { fields: { orderBy: { fieldOrder: 'asc' } } },
         });
+        return this.mapTemplate(template);
     }
     async findAllByUser(userId, page = 1, limit = 20) {
         const skip = (page - 1) * limit;
@@ -50,7 +82,7 @@ let LogTemplateService = class LogTemplateService {
             this.prisma.logTemplate.count({ where: { userId } }),
         ]);
         return {
-            data,
+            data: data.map((template) => this.mapTemplate(template)),
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
     }
@@ -67,7 +99,7 @@ let LogTemplateService = class LogTemplateService {
         if (template.userId !== userId && userRole !== client_1.UserRole.SUPER_ADMIN) {
             throw new common_1.ForbiddenException('You do not have access to this template');
         }
-        return template;
+        return this.mapTemplate(template);
     }
     async update(id, userId, userRole, dto) {
         const template = await this.prisma.logTemplate.findUnique({ where: { id } });
@@ -99,6 +131,7 @@ let LogTemplateService = class LogTemplateService {
                                 fieldOrder: f.fieldOrder,
                                 placeholder: f.placeholder,
                                 defaultValue: f.defaultValue,
+                                fieldOptions: this.serializeFieldOptions(f.fieldOptions),
                             },
                         });
                     }
@@ -111,6 +144,7 @@ let LogTemplateService = class LogTemplateService {
                                 fieldOrder: f.fieldOrder ?? 0,
                                 placeholder: f.placeholder,
                                 defaultValue: f.defaultValue,
+                                fieldOptions: this.serializeFieldOptions(f.fieldOptions),
                             },
                         });
                     }
@@ -194,7 +228,7 @@ let LogTemplateService = class LogTemplateService {
         if (account.userId !== userId && userRole !== client_1.UserRole.SUPER_ADMIN) {
             throw new common_1.ForbiddenException('Not your account');
         }
-        return account.logTemplate;
+        return this.mapTemplate(account.logTemplate);
     }
 };
 exports.LogTemplateService = LogTemplateService;

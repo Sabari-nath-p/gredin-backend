@@ -3,11 +3,13 @@ import {
     IsString,
     IsOptional,
     IsArray,
+    ArrayNotEmpty,
     ValidateNested,
     IsEnum,
     IsInt,
     IsBoolean,
     Min,
+    ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { FieldType } from './create-log-template.dto';
@@ -44,6 +46,14 @@ export class UpdateTemplateFieldDto {
     @IsString()
     @IsOptional()
     defaultValue?: string;
+
+    @ApiProperty({ description: 'Choice options for MULTIPLE_CHOICE fields', type: [String], required: false })
+    @ValidateIf((o) => o.fieldType === FieldType.MULTIPLE_CHOICE)
+    @IsArray()
+    @ArrayNotEmpty()
+    @IsString({ each: true })
+    @IsOptional()
+    fieldOptions?: string[];
 }
 
 export class UpdateLogTemplateDto {

@@ -4,10 +4,12 @@ import {
     IsNotEmpty,
     IsOptional,
     IsArray,
+    ArrayNotEmpty,
     ValidateNested,
     IsEnum,
     IsInt,
     Min,
+    ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -16,6 +18,7 @@ export enum FieldType {
     LONG_TEXT = 'LONG_TEXT',
     CHECKBOX = 'CHECKBOX',
     IMAGE = 'IMAGE',
+    MULTIPLE_CHOICE = 'MULTIPLE_CHOICE',
 }
 
 export class CreateTemplateFieldDto {
@@ -44,6 +47,19 @@ export class CreateTemplateFieldDto {
     @IsString()
     @IsOptional()
     defaultValue?: string;
+
+    @ApiProperty({
+        description: 'Choice options for MULTIPLE_CHOICE fields',
+        required: false,
+        type: [String],
+        example: ['A+ setup', 'B setup', 'C setup'],
+    })
+    @ValidateIf((o) => o.fieldType === FieldType.MULTIPLE_CHOICE)
+    @IsArray()
+    @ArrayNotEmpty()
+    @IsString({ each: true })
+    @IsOptional()
+    fieldOptions?: string[];
 }
 
 export class CreateLogTemplateDto {

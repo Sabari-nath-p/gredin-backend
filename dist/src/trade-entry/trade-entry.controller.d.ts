@@ -36,6 +36,7 @@ export declare class TradeEntryController {
                     fieldType: import(".prisma/client").$Enums.FieldType;
                     placeholder: string | null;
                     defaultValue: string | null;
+                    fieldOptions: string | null;
                 };
             } & {
                 id: string;
