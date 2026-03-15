@@ -10,6 +10,7 @@ import { TradeEntryModule } from './trade-entry/trade-entry.module';
 import { LogTemplateModule } from './log-template/log-template.module';
 import { S3Module } from './s3/s3.module';
 import { ChatModule } from './chat/chat.module';
+import { Mt5SyncModule } from './mt5-sync/mt5-sync.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ChatModule } from './chat/chat.module';
     LogTemplateModule,
     S3Module,
     ChatModule,
+    Mt5SyncModule,
   ],
   controllers: [AppController],
   providers: [AppService],

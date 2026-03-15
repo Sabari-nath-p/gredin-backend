@@ -97,6 +97,10 @@ model TradeAccount {
   isActive            Boolean       @default(true)
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
+  mt5Login            String?
+  mt5Password         String?
+  mt5Server           String?
+  lastSyncTime        DateTime?
   tradeEntries        TradeEntry[]
   logTemplateId       String?
   logTemplate         LogTemplate?     @relation("AccountTemplate", fields: [logTemplateId], references: [id], onDelete: SetNull)
@@ -126,12 +130,14 @@ model TradeEntry {
   notes                 String?             @db.Text
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
+  mt5TicketId           String?
   fieldValues           TradeFieldValue[]
   
   @@index([tradeAccountId])
   @@index([status])
   @@index([entryDateTime])
   @@index([instrument])
+  @@unique([tradeAccountId, mt5TicketId])
 }
 
 // ─── Log Templates ───
