@@ -90,7 +90,7 @@ export class Mt5SyncService {
     const endTimestamp = Math.floor(Date.now() / 1000) + 86400; 
 
     // Call Python FastAPI MTrunner
-    const pythonApiUrl = 'http://localhost:8000/api/mt5/sync';
+    const pythonApiUrl = this.config.get<string>('MT5_RUNNER_URL') || 'http://127.0.0.1:8000/api/mt5/sync';
     let response;
     
     try {
@@ -191,4 +191,5 @@ export class Mt5SyncService {
     return { added: addedCount, message: `Successfully synced ${addedCount} new trades.` };
   }
 }
+
 

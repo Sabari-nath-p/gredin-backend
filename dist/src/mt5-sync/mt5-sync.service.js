@@ -85,7 +85,7 @@ let Mt5SyncService = Mt5SyncService_1 = class Mt5SyncService {
             ? Math.floor(account.lastSyncTime.getTime() / 1000) - 86400
             : Math.floor(Date.now() / 1000) - (30 * 86400);
         const endTimestamp = Math.floor(Date.now() / 1000) + 86400;
-        const pythonApiUrl = 'http://localhost:8000/api/mt5/sync';
+        const pythonApiUrl = this.config.get('MT5_RUNNER_URL') || 'http://127.0.0.1:8000/api/mt5/sync';
         let response;
         try {
             response = await fetch(pythonApiUrl, {

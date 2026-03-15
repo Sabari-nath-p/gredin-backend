@@ -1,0 +1,1 @@
+$content = Get-Content C:\gredin\backend\src\mt5-sync\mt5-sync.service.ts -Raw; $content = $content -replace "const pythonApiUrl = 'http://localhost:8000/api/mt5/sync';", "const pythonApiUrl = this.config.get<string>('MT5_RUNNER_URL') || 'http://127.0.0.1:8000/api/mt5/sync';"; Set-Content C:\gredin\backend\src\mt5-sync\mt5-sync.service.ts -Value $content;
