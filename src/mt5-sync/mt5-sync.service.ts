@@ -109,7 +109,8 @@ export class Mt5SyncService {
     const endTimestamp = Math.floor(Date.now() / 1000) + 86400; 
 
     // Call Python FastAPI MTrunner (normally hosted on a separate Windows VM/VPS in production)
-    const pythonApiUrl = 'http://localhost:8000/api/mt5/sync';
+    const pythonApiUrl =
+      this.config.get<string>('MT5_RUNNER_URL') || 'http://host.docker.internal:8000/api/mt5/sync';
     const runnerApiKey = this.config.get<string>('MT5_RUNNER_API_KEY') || '';
     const timeoutMs = Number(this.config.get<string>('MT5_RUNNER_TIMEOUT_MS') || '30000');
 
