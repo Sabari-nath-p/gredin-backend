@@ -60,50 +60,109 @@ export class EmailService {
   }
 
   async sendOtpEmail(email: string, otp: string): Promise<void> {
-    if (!this.transporter) {
-      if (this.isProduction) {
-        throw new ServiceUnavailableException(
-          'Email service is not configured. Please set SMTP credentials.',
-        );
-      }
-
-      this.logger.warn(`DEV MODE - OTP for ${email}: ${otp}`);
-      return;
+  if (!this.transporter) {
+    if (this.isProduction) {
+      throw new ServiceUnavailableException(
+        'Email service is not configured. Please contact support.',
+      );
     }
-
-    const mailOptions = {
-      from: this.fromEmail,
-      to: email,
-      subject: 'Your MyTrade Login OTP',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">MyTrade Login OTP</h2>
-          <p>Your One-Time Password (OTP) for logging into MyTrade is:</p>
-          <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; margin: 20px 0;">
-            ${otp}
-          </div>
-          <p>This OTP will expire in 10 minutes.</p>
-          <p style="color: #666; font-size: 12px;">If you didn't request this OTP, please ignore this email.</p>
-        </div>
-      `,
-    };
-
-    // ALWAYS log the OTP to the console so the user can test even if the email provider fails
-    this.logger.log(`\n==============================================\n💡 FALLBACK OTP FOR ${email}: ${otp}\n==============================================\n`);
-
-    try {
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`OTP email sent to ${email}`);
-    } catch (error: unknown) {
-      this.logger.error(`Error sending OTP email to ${email}`, error instanceof Error ? error.stack : undefined);
-
-      // During active setup/testing with a failing SMTP, don't throw 503 so the user can still bypass via the Fallback OTP
-      this.logger.warn(`SMTP failed. Treating as successful internally so you can use the fallback OTP printed above.`);
-      // if (this.isProduction) {
-      //   throw new ServiceUnavailableException('Unable to send OTP email. Please try again later.');
-      // }
-
-      this.logger.warn(`DEV MODE - OTP for ${email}: ${otp}`);
-    }
+    this.logger.warn(`[DEV] OTP for ${email}: ${otp}`);
+    return;
   }
+
+  const mailOptions = {
+    from: `"Gredin" <${this.fromEmail}>`,
+    to: email,
+    subject: 'Your gredin.app verification code',
+    html: `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Your Gredin OTP</title>
+      </head>
+      <body style="margin:0; padding:0; background-color:#f5f5f5; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5; padding: 40px 0;">
+          <tr>
+            <td align="center">
+              <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+                <!-- Header -->
+                <tr>
+                  <td style="background-color:#0f172a; padding:28px 40px;">
+                    <p style="margin:0; font-size:20px; font-weight:700; color:#ffffff; letter-spacing:-0.3px;">
+                      gredin<span style="color:#6366f1;">.app</span>
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Body -->
+                <tr>
+                  <td style="padding:40px 40px 32px;">
+                    <h1 style="margin:0 0 12px; font-size:22px; font-weight:600; color:#0f172a; letter-spacing:-0.3px;">
+                      Verify your identity
+                    </h1>
+                    <p style="margin:0 0 28px; font-size:15px; color:#64748b; line-height:1.6;">
+                      Use the code below to complete your sign-in. It expires in <strong style="color:#0f172a;">10 minutes</strong>.
+                    </p>
+
+                    <!-- OTP Box -->
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center" style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:24px;">
+                          <p style="margin:0; font-size:36px; font-weight:700; letter-spacing:10px; color:#0f172a; font-family:'Courier New', monospace;">
+                            ${otp}
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <p style="margin:28px 0 0; font-size:13px; color:#94a3b8; line-height:1.6;">
+                      If you didn't request this code, you can safely ignore this email. Someone may have entered your address by mistake.
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td style="background-color:#f8fafc; border-top:1px solid #e2e8f0; padding:20px 40px;">
+                    <p style="margin:0; font-size:12px; color:#94a3b8;">
+                      &copy; ${new Date().getFullYear()} gredin.app &nbsp;&middot;&nbsp; This is an automated message, please do not reply.
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    await this.transporter.sendMail(mailOptions);
+    this.logger.log(`OTP email dispatched to ${email}`);
+  } catch (error: unknown) {
+    this.logger.error(
+      `Failed to send OTP email to ${email}`,
+      error instanceof Error ? error.stack : String(error),
+    );
+
+    if (this.isProduction) {
+      throw new ServiceUnavailableException(
+        'Unable to deliver verification email. Please try again later.',
+      );
+    }
+
+    // Dev fallback — log OTP so login flow can be tested without a working SMTP
+    this.logger.warn(
+      `\n${'─'.repeat(52)}\n` +
+      `  [DEV FALLBACK] OTP for ${email}: ${otp}\n` +
+      `${'─'.repeat(52)}\n`,
+    );
+  }
+}
 }
