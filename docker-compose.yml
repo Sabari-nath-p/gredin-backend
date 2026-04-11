@@ -28,11 +28,11 @@ services:
     environment:
       DATABASE_URL: mysql://root:password@mysql:3306/mytrade
       JWT_SECRET: your-secret-key-change-this-in-production
-      EMAIL_HOST: smtp.gmail.com
-      EMAIL_PORT: 587
-      EMAIL_USER: your-email@gmail.com
-      EMAIL_PASSWORD: your-app-password
-      EMAIL_FROM: noreply@mytrade.com
+      MAIL_HOST : smtp.gmail.com
+      MAIL_PORT : 587
+      MAIL_USER : sabarinath5604@gmail.com
+      MAIL_PASSWORD : hdjz kfad cqgb azlt
+      MAIL_FROM : "Gredin <sabarinath5604@gmail.com>"
       GOOGLE_CLIENT_ID: your-google-client-id
       GOOGLE_CLIENT_SECRET: your-google-client-secret
       GOOGLE_CALLBACK_URL: http://localhost:3000/auth/google/callback
