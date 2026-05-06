@@ -89,6 +89,7 @@ export class AgentService {
     let decision: AgentDecision;
     try {
       decision = await this.decideAction(userId, message, tradeAccountId, conversationHistory);
+      this.logger.debug(`Agent decision: ${JSON.stringify(decision)}`);
     } catch (err) {
       const errorMessage = this.getErrorMessage(err);
       this.logger.error(`Agent decision failed: ${errorMessage}`);
@@ -101,10 +102,12 @@ export class AgentService {
 
     // ── STEP 2: Execute safe read-only SQL ──
     const sqlQuery = decision.sqlQuery!;
+    this.logger.debug(`SQL to execute: ${sqlQuery}`);
     let sqlResult: string;
     try {
       const rows = await this.executeSafeQuery(sqlQuery, userId, tradeAccountId);
       sqlResult = JSON.stringify(rows);
+      this.logger.debug(`SQL result rows: ${sqlResult.substring(0, 2000)}`);
     } catch (err) {
       const errorMessage = this.getErrorMessage(err);
       this.logger.warn(`SQL execution failed: ${errorMessage}`);
@@ -193,6 +196,7 @@ Format B (direct answer):
 <decision><action>direct</action><answer>Your helpful answer here</answer></decision>`;
 
     const response = await this.callModel(prompt);
+    this.logger.debug(`Model response: ${response?.substring(0,2000)}`);
     return this.parseDecision(response);
   }
 
@@ -226,7 +230,10 @@ Or if you cannot fix it:
 <decision><action>direct</action><answer>Explanation of why</answer></decision>`;
 
     const response = await this.callModel(prompt);
-    return this.parseDecision(response);
+    this.logger.debug(`Raw decideAction model output: ${response?.substring(0,2000)}`);
+    const parsed = this.parseDecision(response);
+    this.logger.debug(`Parsed decision from model: ${JSON.stringify(parsed)}`);
+    return parsed;
   }
 
   // ─────────── Step 3: Synthesize ───────────
@@ -297,14 +304,25 @@ ${historyXml}
     // Ensure query references the user's data (security check)
     const hasUserFilter = upper.includes(userId.toUpperCase()) ||
       (tradeAccountId && upper.includes(tradeAccountId.toUpperCase())) ||
-      upper.includes('USERID') || upper.includes('TRADEACCOUNTID');
+      upper.includes('USERID') || upper.includes('TRADEACCOUNTID') ||
+      upper.includes('TRADEACCOUNT.ID') || upper.includes('TRADEACCOUNTID');
 
     if (!hasUserFilter) {
-      throw new Error('Query must filter by userId or tradeAccountId for data isolation');
+      this.logger.warn(`Rejected SQL for missing user filter: ${sql}`);
+      throw new Error('Query must filter by userId or tradeAccountId for data isolation; received SQL: ' + (sql.length > 200 ? sql.substring(0,200) + '...' : sql));
     }
 
     // Execute with a timeout and row limit
-    const result = await this.prisma.$queryRawUnsafe(`${sql} LIMIT 500`);
+    // Clean SQL: remove trailing semicolons and whitespace
+    const cleanedSql = sql.trim().replace(/;+$|\s+$/g, '');
+    // Reject multi-statement queries (no semicolons allowed inside)
+    if (cleanedSql.includes(';')) {
+      throw new Error('Multiple statements are not allowed');
+    }
+    // Append LIMIT only if the query does not already include a LIMIT clause
+    const finalSql = /\bLIMIT\b/i.test(cleanedSql) ? cleanedSql : `${cleanedSql} LIMIT 500`;
+    this.logger.debug(`Executing SQL: ${finalSql.substring(0,2000)}`);
+    const result = await this.prisma.$queryRawUnsafe(finalSql);
     return result as any[];
   }
 
