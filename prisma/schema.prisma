@@ -120,7 +120,7 @@ model TradeEntry {
   instrument            String
   direction             TradeDirection
   entryPrice            Decimal?            @db.Decimal(15, 2)
-  positionSize          Int?
+  positionSize          Decimal?            @db.Decimal(15, 8)
   stopLossAmount        Decimal             @db.Decimal(15, 2)
   takeProfitAmount      Decimal             @db.Decimal(15, 2)
   status                TradeStatus         @default(OPEN)

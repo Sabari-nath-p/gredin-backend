@@ -36,7 +36,7 @@ const DB_SCHEMA_XML = `<schema>
   <col name="instrument" type="string"/>
   <col name="direction" type="enum(BUY,SELL)"/>
   <col name="entryPrice" type="decimal(15,2)" nullable="true"/>
-  <col name="positionSize" type="int" nullable="true"/>
+  <col name="positionSize" type="decimal(15,8)" nullable="true"/>
   <col name="stopLossAmount" type="decimal(15,2)"/>
   <col name="takeProfitAmount" type="decimal(15,2)"/>
   <col name="status" type="enum(OPEN,CLOSED)"/>
@@ -58,14 +58,18 @@ export class AgentService {
     private config: ConfigService,
     private prisma: PrismaService,
   ) {
-    this.apiKey = this.config.get<string>('GEMINI_API_KEY') || '';
-    this.modelName = this.config.get<string>('GEMINI_MODEL') || 'gemini-2.0-flash';
+    this.apiKey = this.config.get<string>('NVIDIA_API_KEY') || this.config.get<string>('GEMINI_API_KEY') || '';
+    this.modelName = this.config.get<string>('NVIDIA_MODEL') || 'minimaxai/minimax-m2.7';
+  }
+
+  private getErrorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
   }
 
   /**
    * Main agentic flow:
-   * 1. Ask Gemini if it needs DB data (returns XML decision)
-   * 2. If yes → run safe SQL → send data back to Gemini for analysis
+    * 1. Ask the model if it needs DB data (returns XML decision)
+    * 2. If yes → run safe SQL → send data back for analysis
    * 3. Return final answer
    */
   async process(
@@ -77,7 +81,7 @@ export class AgentService {
     if (!this.apiKey) {
       return {
         answer:
-          'The AI assistant is not configured. Please set the GEMINI_API_KEY environment variable.',
+          'The AI assistant is not configured. Please set the NVIDIA_API_KEY environment variable.',
       };
     }
 
@@ -86,8 +90,9 @@ export class AgentService {
     try {
       decision = await this.decideAction(userId, message, tradeAccountId, conversationHistory);
     } catch (err) {
-      this.logger.error(`Agent decision failed: ${err.message}`);
-      return { answer: this.friendlyError(err.message) };
+      const errorMessage = this.getErrorMessage(err);
+      this.logger.error(`Agent decision failed: ${errorMessage}`);
+      return { answer: this.friendlyError(errorMessage) };
     }
 
     if (!decision.needsData) {
@@ -101,9 +106,10 @@ export class AgentService {
       const rows = await this.executeSafeQuery(sqlQuery, userId, tradeAccountId);
       sqlResult = JSON.stringify(rows);
     } catch (err) {
-      this.logger.warn(`SQL execution failed: ${err.message}`);
+      const errorMessage = this.getErrorMessage(err);
+      this.logger.warn(`SQL execution failed: ${errorMessage}`);
       // Retry once with error feedback
-      const retryDecision = await this.retrySqlGeneration(userId, message, tradeAccountId, sqlQuery, err.message, conversationHistory);
+      const retryDecision = await this.retrySqlGeneration(userId, message, tradeAccountId, sqlQuery, errorMessage, conversationHistory);
       if (!retryDecision.needsData || !retryDecision.sqlQuery) {
         return { answer: retryDecision.directAnswer || 'I was unable to query your data. Please rephrase your question.' };
       }
@@ -111,13 +117,15 @@ export class AgentService {
         const retryRows = await this.executeSafeQuery(retryDecision.sqlQuery, userId, tradeAccountId);
         sqlResult = JSON.stringify(retryRows);
       } catch (retryErr) {
-        return { answer: `I tried to query your data but encountered an error. Could you rephrase your question?\n\nError: ${retryErr.message}` };
+        const retryErrorMessage = this.getErrorMessage(retryErr);
+        return { answer: `I tried to query your data but encountered an error. Could you rephrase your question?\n\nError: ${retryErrorMessage}` };
       }
       try {
         return await this.synthesizeAnswer(message, retryDecision.sqlQuery, sqlResult, conversationHistory);
       } catch (synthErr) {
-        this.logger.error(`Synthesis failed after retry: ${synthErr.message}`);
-        return { answer: this.friendlyError(synthErr.message), sqlQuery: retryDecision.sqlQuery, sqlResult };
+        const errorMessage = this.getErrorMessage(synthErr);
+        this.logger.error(`Synthesis failed after retry: ${errorMessage}`);
+        return { answer: this.friendlyError(errorMessage), sqlQuery: retryDecision.sqlQuery, sqlResult };
       }
     }
 
@@ -125,8 +133,9 @@ export class AgentService {
     try {
       return await this.synthesizeAnswer(message, sqlQuery, sqlResult, conversationHistory);
     } catch (err) {
-      this.logger.error(`Synthesis failed: ${err.message}`);
-      return { answer: this.friendlyError(err.message), sqlQuery, sqlResult };
+      const errorMessage = this.getErrorMessage(err);
+      this.logger.error(`Synthesis failed: ${errorMessage}`);
+      return { answer: this.friendlyError(errorMessage), sqlQuery, sqlResult };
     }
   }
 
@@ -183,7 +192,7 @@ Format A (needs data):
 Format B (direct answer):
 <decision><action>direct</action><answer>Your helpful answer here</answer></decision>`;
 
-    const response = await this.callGemini(prompt);
+    const response = await this.callModel(prompt);
     return this.parseDecision(response);
   }
 
@@ -216,7 +225,7 @@ Respond in XML:
 Or if you cannot fix it:
 <decision><action>direct</action><answer>Explanation of why</answer></decision>`;
 
-    const response = await this.callGemini(prompt);
+    const response = await this.callModel(prompt);
     return this.parseDecision(response);
   }
 
@@ -253,7 +262,7 @@ ${historyXml}
 - Keep the answer focused and under 500 words.
 </rules>`;
 
-    const answer = await this.callGemini(prompt);
+    const answer = await this.callModel(prompt);
 
     return {
       answer: answer || 'I was unable to analyze the data.',
@@ -299,47 +308,46 @@ ${historyXml}
     return result as any[];
   }
 
-  // ─────────── Gemini API Call ───────────
-  private async callGemini(prompt: string): Promise<string> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelName}:generateContent?key=${this.apiKey}`;
+  // ─────────── NVIDIA API Call ───────────
+  private async callModel(prompt: string): Promise<string> {
+    const url = 'https://integrate.api.nvidia.com/v1/chat/completions';
 
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 1024,
-            topP: 0.8,
-          },
-          safetySettings: [
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-          ],
+          model: this.modelName,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.1,
+          top_p: 0.8,
+          max_tokens: 1024,
+          stream: false,
         }),
       });
 
       if (!response.ok) {
         const errBody = await response.text();
-        this.logger.error(`Gemini API error ${response.status}: ${errBody}`);
+        this.logger.error(`NVIDIA API error ${response.status}: ${errBody}`);
         if (response.status === 429) {
           throw new Error('RATE_LIMITED: The AI service is temporarily busy. Please wait a moment and try again.');
         }
-        if (response.status === 403) {
+        if (response.status === 401 || response.status === 403) {
           throw new Error('AUTH_FAILED: The AI API key is invalid or expired. Please check configuration.');
         }
-        throw new Error(`Gemini API returned ${response.status}`);
+        throw new Error(`NVIDIA API returned ${response.status}`);
       }
 
       const data = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const text = data?.choices?.[0]?.message?.content || '';
       return text.trim();
     } catch (err) {
-      this.logger.error(`Gemini call failed: ${err.message}`);
+      const errorMessage = this.getErrorMessage(err);
+      this.logger.error(`NVIDIA call failed: ${errorMessage}`);
       throw err;
     }
   }
