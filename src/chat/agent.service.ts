@@ -53,6 +53,7 @@ export class AgentService {
   private readonly logger = new Logger(AgentService.name);
   private readonly apiKey: string;
   private readonly modelName: string;
+  private readonly requestTimeoutMs: number;
 
   constructor(
     private config: ConfigService,
@@ -60,6 +61,7 @@ export class AgentService {
   ) {
     this.apiKey = this.config.get<string>('NVIDIA_API_KEY') || this.config.get<string>('GEMINI_API_KEY') || '';
     this.modelName = this.config.get<string>('NVIDIA_MODEL') || 'minimaxai/minimax-m2.7';
+    this.requestTimeoutMs = Number(this.config.get<string>('NVIDIA_TIMEOUT_MS') || 45000);
   }
 
   private getErrorMessage(err: unknown): string {
@@ -77,6 +79,7 @@ export class AgentService {
     message: string,
     tradeAccountId: string | null,
     conversationHistory: { role: string; content: string }[],
+    requestId?: string,
   ): Promise<AgentResult> {
     if (!this.apiKey) {
       return {
@@ -88,7 +91,7 @@ export class AgentService {
     // ── STEP 1: Decide if data is needed ──
     let decision: AgentDecision;
     try {
-      decision = await this.decideAction(userId, message, tradeAccountId, conversationHistory);
+      decision = await this.decideAction(userId, message, tradeAccountId, conversationHistory, requestId);
       this.logger.debug(`Agent decision: ${JSON.stringify(decision)}`);
     } catch (err) {
       const errorMessage = this.getErrorMessage(err);
@@ -124,7 +127,7 @@ export class AgentService {
         return { answer: `I tried to query your data but encountered an error. Could you rephrase your question?\n\nError: ${retryErrorMessage}` };
       }
       try {
-        return await this.synthesizeAnswer(message, retryDecision.sqlQuery, sqlResult, conversationHistory);
+        return await this.synthesizeAnswer(message, retryDecision.sqlQuery, sqlResult, conversationHistory, requestId);
       } catch (synthErr) {
         const errorMessage = this.getErrorMessage(synthErr);
         this.logger.error(`Synthesis failed after retry: ${errorMessage}`);
@@ -134,7 +137,7 @@ export class AgentService {
 
     // ── STEP 3: Synthesize answer from data ──
     try {
-      return await this.synthesizeAnswer(message, sqlQuery, sqlResult, conversationHistory);
+      return await this.synthesizeAnswer(message, sqlQuery, sqlResult, conversationHistory, requestId);
     } catch (err) {
       const errorMessage = this.getErrorMessage(err);
       this.logger.error(`Synthesis failed: ${errorMessage}`);
@@ -159,6 +162,7 @@ export class AgentService {
     message: string,
     tradeAccountId: string | null,
     history: { role: string; content: string }[],
+    requestId?: string,
   ): Promise<AgentDecision> {
     const accountFilter = tradeAccountId
       ? `The user has selected account ID: "${tradeAccountId}". Scope queries to this account's trades.`
@@ -195,7 +199,7 @@ Format A (needs data):
 Format B (direct answer):
 <decision><action>direct</action><answer>Your helpful answer here</answer></decision>`;
 
-    const response = await this.callModel(prompt);
+    const response = await this.callModel(prompt, requestId);
     this.logger.debug(`Model response: ${response?.substring(0,2000)}`);
     return this.parseDecision(response);
   }
@@ -242,6 +246,7 @@ Or if you cannot fix it:
     sqlQuery: string,
     sqlResult: string,
     history: { role: string; content: string }[],
+    requestId?: string,
   ): Promise<AgentResult> {
     // Truncate large results to save tokens
     const truncatedResult = sqlResult.length > 8000 ? sqlResult.substring(0, 8000) + '...(truncated)' : sqlResult;
@@ -269,7 +274,7 @@ ${historyXml}
 - Keep the answer focused and under 500 words.
 </rules>`;
 
-    const answer = await this.callModel(prompt);
+    const answer = await this.callModel(prompt, requestId);
 
     return {
       answer: answer || 'I was unable to analyze the data.',
@@ -327,10 +332,15 @@ ${historyXml}
   }
 
   // ─────────── NVIDIA API Call ───────────
-  private async callModel(prompt: string): Promise<string> {
+  private async callModel(prompt: string, requestId?: string): Promise<string> {
     const url = 'https://integrate.api.nvidia.com/v1/chat/completions';
 
     try {
+      const startedAt = Date.now();
+      const rid = requestId ? ` requestId=${requestId}` : '';
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -338,6 +348,7 @@ ${historyXml}
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
+        signal: controller.signal,
         body: JSON.stringify({
           model: this.modelName,
           messages: [{ role: 'user', content: prompt }],
@@ -348,9 +359,11 @@ ${historyXml}
         }),
       });
 
+      clearTimeout(timeout);
+
       if (!response.ok) {
         const errBody = await response.text();
-        this.logger.error(`NVIDIA API error ${response.status}: ${errBody}`);
+        this.logger.error(`NVIDIA API error${rid} status=${response.status} ms=${Date.now() - startedAt}: ${errBody.substring(0, 4000)}`);
         if (response.status === 429) {
           throw new Error('RATE_LIMITED: The AI service is temporarily busy. Please wait a moment and try again.');
         }
@@ -362,10 +375,15 @@ ${historyXml}
 
       const data = await response.json();
       const text = data?.choices?.[0]?.message?.content || '';
+      this.logger.debug(`NVIDIA API ok${rid} ms=${Date.now() - startedAt} chars=${text.length}`);
       return text.trim();
     } catch (err) {
       const errorMessage = this.getErrorMessage(err);
-      this.logger.error(`NVIDIA call failed: ${errorMessage}`);
+      if (errorMessage.includes('aborted') || errorMessage.includes('AbortError')) {
+        this.logger.error(`NVIDIA call timed out${requestId ? ` requestId=${requestId}` : ''} after ${this.requestTimeoutMs}ms: ${errorMessage}`);
+        throw new Error(`AI request timed out after ${Math.round(this.requestTimeoutMs / 1000)}s`);
+      }
+      this.logger.error(`NVIDIA call failed${requestId ? ` requestId=${requestId}` : ''}: ${errorMessage}`);
       throw err;
     }
   }

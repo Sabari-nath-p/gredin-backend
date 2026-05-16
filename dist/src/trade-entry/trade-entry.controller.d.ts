@@ -15,7 +15,7 @@ export declare class TradeEntryController {
         instrument: string;
         direction: import(".prisma/client").$Enums.TradeDirection;
         entryPrice: import("@prisma/client/runtime/library").Decimal | null;
-        positionSize: number | null;
+        positionSize: import("@prisma/client/runtime/library").Decimal | null;
         stopLossAmount: import("@prisma/client/runtime/library").Decimal;
         takeProfitAmount: import("@prisma/client/runtime/library").Decimal;
         status: import(".prisma/client").$Enums.TradeStatus;
@@ -32,12 +32,12 @@ export declare class TradeEntryController {
                     createdAt: Date;
                     updatedAt: Date;
                     fieldOrder: number;
+                    templateId: string;
                     fieldName: string;
                     fieldType: import(".prisma/client").$Enums.FieldType;
                     placeholder: string | null;
                     defaultValue: string | null;
                     fieldOptions: string | null;
-                    templateId: string;
                 };
             } & {
                 id: string;
@@ -59,7 +59,7 @@ export declare class TradeEntryController {
             instrument: string;
             direction: import(".prisma/client").$Enums.TradeDirection;
             entryPrice: import("@prisma/client/runtime/library").Decimal | null;
-            positionSize: number | null;
+            positionSize: import("@prisma/client/runtime/library").Decimal | null;
             stopLossAmount: import("@prisma/client/runtime/library").Decimal;
             takeProfitAmount: import("@prisma/client/runtime/library").Decimal;
             status: import(".prisma/client").$Enums.TradeStatus;
@@ -102,7 +102,7 @@ export declare class TradeEntryController {
         instrument: string;
         direction: import(".prisma/client").$Enums.TradeDirection;
         entryPrice: import("@prisma/client/runtime/library").Decimal | null;
-        positionSize: number | null;
+        positionSize: import("@prisma/client/runtime/library").Decimal | null;
         stopLossAmount: import("@prisma/client/runtime/library").Decimal;
         takeProfitAmount: import("@prisma/client/runtime/library").Decimal;
         status: import(".prisma/client").$Enums.TradeStatus;
@@ -121,7 +121,7 @@ export declare class TradeEntryController {
         instrument: string;
         direction: import(".prisma/client").$Enums.TradeDirection;
         entryPrice: import("@prisma/client/runtime/library").Decimal | null;
-        positionSize: number | null;
+        positionSize: import("@prisma/client/runtime/library").Decimal | null;
         stopLossAmount: import("@prisma/client/runtime/library").Decimal;
         takeProfitAmount: import("@prisma/client/runtime/library").Decimal;
         status: import(".prisma/client").$Enums.TradeStatus;
@@ -140,7 +140,7 @@ export declare class TradeEntryController {
         instrument: string;
         direction: import(".prisma/client").$Enums.TradeDirection;
         entryPrice: import("@prisma/client/runtime/library").Decimal | null;
-        positionSize: number | null;
+        positionSize: import("@prisma/client/runtime/library").Decimal | null;
         stopLossAmount: import("@prisma/client/runtime/library").Decimal;
         takeProfitAmount: import("@prisma/client/runtime/library").Decimal;
         status: import(".prisma/client").$Enums.TradeStatus;
@@ -160,7 +160,7 @@ export declare class TradeEntryController {
         instrument: string;
         direction: import(".prisma/client").$Enums.TradeDirection;
         entryPrice: import("@prisma/client/runtime/library").Decimal | null;
-        positionSize: number | null;
+        positionSize: import("@prisma/client/runtime/library").Decimal | null;
         stopLossAmount: import("@prisma/client/runtime/library").Decimal;
         takeProfitAmount: import("@prisma/client/runtime/library").Decimal;
         status: import(".prisma/client").$Enums.TradeStatus;

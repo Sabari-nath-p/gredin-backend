@@ -8,14 +8,16 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var ChatService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChatService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const agent_service_1 = require("./agent.service");
-let ChatService = class ChatService {
+let ChatService = ChatService_1 = class ChatService {
     prisma;
     agent;
+    logger = new common_1.Logger(ChatService_1.name);
     constructor(prisma, agent) {
         this.prisma = prisma;
         this.agent = agent;
@@ -54,7 +56,7 @@ let ChatService = class ChatService {
             throw new common_1.ForbiddenException();
         return session;
     }
-    async sendMessage(userId, dto) {
+    async sendMessage(userId, dto, meta) {
         let session;
         if (dto.sessionId) {
             session = await this.prisma.chatSession.findUnique({
@@ -96,9 +98,11 @@ let ChatService = class ChatService {
         }));
         let result;
         try {
-            result = await this.agent.process(userId, dto.message, tradeAccountId, history);
+            result = await this.agent.process(userId, dto.message, tradeAccountId, history, meta?.requestId);
         }
         catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            this.logger.error(`Agent process failed requestId=${meta?.requestId ?? 'n/a'} socketId=${meta?.socketId ?? 'n/a'}: ${msg}`);
             result = { answer: '❌ Sorry, I encountered an unexpected error. Please try again in a moment.' };
         }
         const assistantMsg = await this.prisma.chatMessage.create({
@@ -142,7 +146,7 @@ let ChatService = class ChatService {
     }
 };
 exports.ChatService = ChatService;
-exports.ChatService = ChatService = __decorate([
+exports.ChatService = ChatService = ChatService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         agent_service_1.AgentService])

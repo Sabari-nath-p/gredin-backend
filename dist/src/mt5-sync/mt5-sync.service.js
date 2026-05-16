@@ -44,6 +44,16 @@ let Mt5SyncService = Mt5SyncService_1 = class Mt5SyncService {
         decrypted += decipher.final('utf8');
         return decrypted;
     }
+    async readRunnerError(response) {
+        const payload = await response.json().catch(() => null);
+        if (payload?.detail) {
+            return String(payload.detail);
+        }
+        if (payload?.message) {
+            return String(payload.message);
+        }
+        return response.statusText || 'Unknown MT5 runner error';
+    }
     async linkAccount(userId, accountId, dto) {
         const account = await this.prisma.tradeAccount.findFirst({
             where: { id: accountId, userId }
@@ -85,12 +95,20 @@ let Mt5SyncService = Mt5SyncService_1 = class Mt5SyncService {
             ? Math.floor(account.lastSyncTime.getTime() / 1000) - 86400
             : Math.floor(Date.now() / 1000) - (30 * 86400);
         const endTimestamp = Math.floor(Date.now() / 1000) + 86400;
-        const pythonApiUrl = this.config.get('MT5_RUNNER_URL') || 'http://127.0.0.1:8000/api/mt5/sync';
+        const pythonApiUrl = this.config.get('MT5_RUNNER_URL') || 'http://host.docker.internal:8000/api/mt5/sync';
+        const runnerApiKey = this.config.get('MT5_RUNNER_API_KEY') || '';
+        const timeoutMs = Number(this.config.get('MT5_RUNNER_TIMEOUT_MS') || '30000');
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
         let response;
         try {
             response = await fetch(pythonApiUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(runnerApiKey ? { 'x-api-key': runnerApiKey } : {}),
+                },
+                signal: controller.signal,
                 body: JSON.stringify({
                     login: parseInt(account.mt5Login, 10),
                     password: decryptedPassword,
@@ -101,14 +119,31 @@ let Mt5SyncService = Mt5SyncService_1 = class Mt5SyncService {
             });
         }
         catch (e) {
+            if (e.name === 'AbortError') {
+                this.logger.error(`MT5 Runner timeout after ${timeoutMs}ms: ${pythonApiUrl}`);
+                throw new common_1.GatewayTimeoutException(`MT5 runner timed out after ${timeoutMs}ms. Check runner health and network latency.`);
+            }
             this.logger.error(`Failed to reach MT5 Runner at ${pythonApiUrl}:`, e);
-            throw new common_1.BadRequestException('Failed to communicate with MT5 sync runner. Is it running on port 8000?');
+            throw new common_1.ServiceUnavailableException('Failed to communicate with MT5 sync runner. Check MT5_RUNNER_URL, firewall rules, and runner status.');
+        }
+        finally {
+            clearTimeout(timeout);
         }
         if (!response.ok) {
-            const errorData = await response.json().catch(() => null);
-            throw new common_1.BadRequestException(`MT5 Sync failed: ${errorData?.detail || response.statusText}`);
+            const detail = await this.readRunnerError(response);
+            if (response.status === 401 || response.status === 403) {
+                throw new common_1.BadRequestException(`MT5 runner auth failed: ${detail}`);
+            }
+            if (response.status >= 500) {
+                throw new common_1.ServiceUnavailableException(`MT5 runner failed: ${detail}`);
+            }
+            throw new common_1.BadRequestException(`MT5 Sync failed: ${detail}`);
         }
-        const { deals } = await response.json();
+        const body = await response.json().catch(() => null);
+        if (!body || !Array.isArray(body.deals)) {
+            throw new common_1.InternalServerErrorException('Invalid response from MT5 runner: expected deals array.');
+        }
+        const { deals } = body;
         if (!deals || deals.length === 0) {
             await this.prisma.tradeAccount.update({ where: { id: accountId }, data: { lastSyncTime: new Date() } });
             return { added: 0, message: 'No new deals found.' };

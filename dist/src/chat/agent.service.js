@@ -35,7 +35,7 @@ const DB_SCHEMA_XML = `<schema>
   <col name="instrument" type="string"/>
   <col name="direction" type="enum(BUY,SELL)"/>
   <col name="entryPrice" type="decimal(15,2)" nullable="true"/>
-  <col name="positionSize" type="int" nullable="true"/>
+  <col name="positionSize" type="decimal(15,8)" nullable="true"/>
   <col name="stopLossAmount" type="decimal(15,2)"/>
   <col name="takeProfitAmount" type="decimal(15,2)"/>
   <col name="status" type="enum(OPEN,CLOSED)"/>
@@ -52,38 +52,48 @@ let AgentService = AgentService_1 = class AgentService {
     logger = new common_1.Logger(AgentService_1.name);
     apiKey;
     modelName;
+    requestTimeoutMs;
     constructor(config, prisma) {
         this.config = config;
         this.prisma = prisma;
-        this.apiKey = this.config.get('GEMINI_API_KEY') || '';
-        this.modelName = this.config.get('GEMINI_MODEL') || 'gemini-2.0-flash';
+        this.apiKey = this.config.get('NVIDIA_API_KEY') || this.config.get('GEMINI_API_KEY') || '';
+        this.modelName = this.config.get('NVIDIA_MODEL') || 'minimaxai/minimax-m2.7';
+        this.requestTimeoutMs = Number(this.config.get('NVIDIA_TIMEOUT_MS') || 45000);
     }
-    async process(userId, message, tradeAccountId, conversationHistory) {
+    getErrorMessage(err) {
+        return err instanceof Error ? err.message : String(err);
+    }
+    async process(userId, message, tradeAccountId, conversationHistory, requestId) {
         if (!this.apiKey) {
             return {
-                answer: 'The AI assistant is not configured. Please set the GEMINI_API_KEY environment variable.',
+                answer: 'The AI assistant is not configured. Please set the NVIDIA_API_KEY environment variable.',
             };
         }
         let decision;
         try {
-            decision = await this.decideAction(userId, message, tradeAccountId, conversationHistory);
+            decision = await this.decideAction(userId, message, tradeAccountId, conversationHistory, requestId);
+            this.logger.debug(`Agent decision: ${JSON.stringify(decision)}`);
         }
         catch (err) {
-            this.logger.error(`Agent decision failed: ${err.message}`);
-            return { answer: this.friendlyError(err.message) };
+            const errorMessage = this.getErrorMessage(err);
+            this.logger.error(`Agent decision failed: ${errorMessage}`);
+            return { answer: this.friendlyError(errorMessage) };
         }
         if (!decision.needsData) {
             return { answer: decision.directAnswer || 'I could not generate a response.' };
         }
         const sqlQuery = decision.sqlQuery;
+        this.logger.debug(`SQL to execute: ${sqlQuery}`);
         let sqlResult;
         try {
             const rows = await this.executeSafeQuery(sqlQuery, userId, tradeAccountId);
             sqlResult = JSON.stringify(rows);
+            this.logger.debug(`SQL result rows: ${sqlResult.substring(0, 2000)}`);
         }
         catch (err) {
-            this.logger.warn(`SQL execution failed: ${err.message}`);
-            const retryDecision = await this.retrySqlGeneration(userId, message, tradeAccountId, sqlQuery, err.message, conversationHistory);
+            const errorMessage = this.getErrorMessage(err);
+            this.logger.warn(`SQL execution failed: ${errorMessage}`);
+            const retryDecision = await this.retrySqlGeneration(userId, message, tradeAccountId, sqlQuery, errorMessage, conversationHistory);
             if (!retryDecision.needsData || !retryDecision.sqlQuery) {
                 return { answer: retryDecision.directAnswer || 'I was unable to query your data. Please rephrase your question.' };
             }
@@ -92,22 +102,25 @@ let AgentService = AgentService_1 = class AgentService {
                 sqlResult = JSON.stringify(retryRows);
             }
             catch (retryErr) {
-                return { answer: `I tried to query your data but encountered an error. Could you rephrase your question?\n\nError: ${retryErr.message}` };
+                const retryErrorMessage = this.getErrorMessage(retryErr);
+                return { answer: `I tried to query your data but encountered an error. Could you rephrase your question?\n\nError: ${retryErrorMessage}` };
             }
             try {
-                return await this.synthesizeAnswer(message, retryDecision.sqlQuery, sqlResult, conversationHistory);
+                return await this.synthesizeAnswer(message, retryDecision.sqlQuery, sqlResult, conversationHistory, requestId);
             }
             catch (synthErr) {
-                this.logger.error(`Synthesis failed after retry: ${synthErr.message}`);
-                return { answer: this.friendlyError(synthErr.message), sqlQuery: retryDecision.sqlQuery, sqlResult };
+                const errorMessage = this.getErrorMessage(synthErr);
+                this.logger.error(`Synthesis failed after retry: ${errorMessage}`);
+                return { answer: this.friendlyError(errorMessage), sqlQuery: retryDecision.sqlQuery, sqlResult };
             }
         }
         try {
-            return await this.synthesizeAnswer(message, sqlQuery, sqlResult, conversationHistory);
+            return await this.synthesizeAnswer(message, sqlQuery, sqlResult, conversationHistory, requestId);
         }
         catch (err) {
-            this.logger.error(`Synthesis failed: ${err.message}`);
-            return { answer: this.friendlyError(err.message), sqlQuery, sqlResult };
+            const errorMessage = this.getErrorMessage(err);
+            this.logger.error(`Synthesis failed: ${errorMessage}`);
+            return { answer: this.friendlyError(errorMessage), sqlQuery, sqlResult };
         }
     }
     friendlyError(msg) {
@@ -119,7 +132,7 @@ let AgentService = AgentService_1 = class AgentService {
         }
         return '❌ Something went wrong while processing your request. Please try again in a moment.';
     }
-    async decideAction(userId, message, tradeAccountId, history) {
+    async decideAction(userId, message, tradeAccountId, history, requestId) {
         const accountFilter = tradeAccountId
             ? `The user has selected account ID: "${tradeAccountId}". Scope queries to this account's trades.`
             : `No specific account selected. The user's ID is "${userId}". Query across ALL their accounts (join TradeEntry with TradeAccount WHERE TradeAccount.userId = '${userId}').`;
@@ -152,7 +165,8 @@ Format A (needs data):
 
 Format B (direct answer):
 <decision><action>direct</action><answer>Your helpful answer here</answer></decision>`;
-        const response = await this.callGemini(prompt);
+        const response = await this.callModel(prompt, requestId);
+        this.logger.debug(`Model response: ${response?.substring(0, 2000)}`);
         return this.parseDecision(response);
     }
     async retrySqlGeneration(userId, message, tradeAccountId, failedSql, errorMsg, history) {
@@ -174,10 +188,13 @@ Respond in XML:
 
 Or if you cannot fix it:
 <decision><action>direct</action><answer>Explanation of why</answer></decision>`;
-        const response = await this.callGemini(prompt);
-        return this.parseDecision(response);
+        const response = await this.callModel(prompt);
+        this.logger.debug(`Raw decideAction model output: ${response?.substring(0, 2000)}`);
+        const parsed = this.parseDecision(response);
+        this.logger.debug(`Parsed decision from model: ${JSON.stringify(parsed)}`);
+        return parsed;
     }
-    async synthesizeAnswer(message, sqlQuery, sqlResult, history) {
+    async synthesizeAnswer(message, sqlQuery, sqlResult, history, requestId) {
         const truncatedResult = sqlResult.length > 8000 ? sqlResult.substring(0, 8000) + '...(truncated)' : sqlResult;
         const historyXml = history.length
             ? `<history>\n${history.slice(-4).map(h => `<msg role="${h.role}">${h.content.substring(0, 200)}</msg>`).join('\n')}\n</history>`
@@ -200,7 +217,7 @@ ${historyXml}
 - Do NOT include raw JSON or SQL in your response.
 - Keep the answer focused and under 500 words.
 </rules>`;
-        const answer = await this.callGemini(prompt);
+        const answer = await this.callModel(prompt, requestId);
         return {
             answer: answer || 'I was unable to analyze the data.',
             sqlQuery,
@@ -221,51 +238,69 @@ ${historyXml}
         }
         const hasUserFilter = upper.includes(userId.toUpperCase()) ||
             (tradeAccountId && upper.includes(tradeAccountId.toUpperCase())) ||
-            upper.includes('USERID') || upper.includes('TRADEACCOUNTID');
+            upper.includes('USERID') || upper.includes('TRADEACCOUNTID') ||
+            upper.includes('TRADEACCOUNT.ID') || upper.includes('TRADEACCOUNTID');
         if (!hasUserFilter) {
-            throw new Error('Query must filter by userId or tradeAccountId for data isolation');
+            this.logger.warn(`Rejected SQL for missing user filter: ${sql}`);
+            throw new Error('Query must filter by userId or tradeAccountId for data isolation; received SQL: ' + (sql.length > 200 ? sql.substring(0, 200) + '...' : sql));
         }
-        const result = await this.prisma.$queryRawUnsafe(`${sql} LIMIT 500`);
+        const cleanedSql = sql.trim().replace(/;+$|\s+$/g, '');
+        if (cleanedSql.includes(';')) {
+            throw new Error('Multiple statements are not allowed');
+        }
+        const finalSql = /\bLIMIT\b/i.test(cleanedSql) ? cleanedSql : `${cleanedSql} LIMIT 500`;
+        this.logger.debug(`Executing SQL: ${finalSql.substring(0, 2000)}`);
+        const result = await this.prisma.$queryRawUnsafe(finalSql);
         return result;
     }
-    async callGemini(prompt) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelName}:generateContent?key=${this.apiKey}`;
+    async callModel(prompt, requestId) {
+        const url = 'https://integrate.api.nvidia.com/v1/chat/completions';
         try {
+            const startedAt = Date.now();
+            const rid = requestId ? ` requestId=${requestId}` : '';
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    Authorization: `Bearer ${this.apiKey}`,
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                signal: controller.signal,
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        temperature: 0.1,
-                        maxOutputTokens: 1024,
-                        topP: 0.8,
-                    },
-                    safetySettings: [
-                        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-                        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-                        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-                        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-                    ],
+                    model: this.modelName,
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: 0.1,
+                    top_p: 0.8,
+                    max_tokens: 1024,
+                    stream: false,
                 }),
             });
+            clearTimeout(timeout);
             if (!response.ok) {
                 const errBody = await response.text();
-                this.logger.error(`Gemini API error ${response.status}: ${errBody}`);
+                this.logger.error(`NVIDIA API error${rid} status=${response.status} ms=${Date.now() - startedAt}: ${errBody.substring(0, 4000)}`);
                 if (response.status === 429) {
                     throw new Error('RATE_LIMITED: The AI service is temporarily busy. Please wait a moment and try again.');
                 }
-                if (response.status === 403) {
+                if (response.status === 401 || response.status === 403) {
                     throw new Error('AUTH_FAILED: The AI API key is invalid or expired. Please check configuration.');
                 }
-                throw new Error(`Gemini API returned ${response.status}`);
+                throw new Error(`NVIDIA API returned ${response.status}`);
             }
             const data = await response.json();
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const text = data?.choices?.[0]?.message?.content || '';
+            this.logger.debug(`NVIDIA API ok${rid} ms=${Date.now() - startedAt} chars=${text.length}`);
             return text.trim();
         }
         catch (err) {
-            this.logger.error(`Gemini call failed: ${err.message}`);
+            const errorMessage = this.getErrorMessage(err);
+            if (errorMessage.includes('aborted') || errorMessage.includes('AbortError')) {
+                this.logger.error(`NVIDIA call timed out${requestId ? ` requestId=${requestId}` : ''} after ${this.requestTimeoutMs}ms: ${errorMessage}`);
+                throw new Error(`AI request timed out after ${Math.round(this.requestTimeoutMs / 1000)}s`);
+            }
+            this.logger.error(`NVIDIA call failed${requestId ? ` requestId=${requestId}` : ''}: ${errorMessage}`);
             throw err;
         }
     }

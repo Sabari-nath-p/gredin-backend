@@ -11,17 +11,19 @@ export declare class AgentService {
     private readonly logger;
     private readonly apiKey;
     private readonly modelName;
+    private readonly requestTimeoutMs;
     constructor(config: ConfigService, prisma: PrismaService);
+    private getErrorMessage;
     process(userId: string, message: string, tradeAccountId: string | null, conversationHistory: {
         role: string;
         content: string;
-    }[]): Promise<AgentResult>;
+    }[], requestId?: string): Promise<AgentResult>;
     private friendlyError;
     private decideAction;
     private retrySqlGeneration;
     private synthesizeAnswer;
     private executeSafeQuery;
-    private callGemini;
+    private callModel;
     private parseDecision;
 }
 export {};

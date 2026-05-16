@@ -19,20 +19,20 @@ export declare class TradeAccountService {
             } | null;
         } & {
             id: string;
+            isActive: boolean;
+            createdAt: Date;
+            updatedAt: Date;
             userId: string;
             accountName: string;
             brokerName: string;
             marketSegment: import(".prisma/client").$Enums.MarketSegment;
             currencyCode: string;
             initialBalance: import("@prisma/client/runtime/library").Decimal;
-            currentBalance: import("@prisma/client/runtime/library").Decimal;
             accountType: import(".prisma/client").$Enums.AccountType;
-            isActive: boolean;
-            createdAt: Date;
-            updatedAt: Date;
             mt5Login: string | null;
             mt5Password: string | null;
             mt5Server: string | null;
+            currentBalance: import("@prisma/client/runtime/library").Decimal;
             lastSyncTime: Date | null;
             logTemplateId: string | null;
         })[];

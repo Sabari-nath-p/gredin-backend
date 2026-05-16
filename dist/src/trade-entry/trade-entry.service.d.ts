@@ -17,12 +17,12 @@ export declare class TradeEntryService {
                     createdAt: Date;
                     updatedAt: Date;
                     fieldOrder: number;
+                    templateId: string;
                     fieldName: string;
                     fieldType: import(".prisma/client").$Enums.FieldType;
                     placeholder: string | null;
                     defaultValue: string | null;
                     fieldOptions: string | null;
-                    templateId: string;
                 };
             } & {
                 id: string;
@@ -44,7 +44,7 @@ export declare class TradeEntryService {
             instrument: string;
             direction: import(".prisma/client").$Enums.TradeDirection;
             entryPrice: Prisma.Decimal | null;
-            positionSize: number | null;
+            positionSize: Prisma.Decimal | null;
             stopLossAmount: Prisma.Decimal;
             takeProfitAmount: Prisma.Decimal;
             status: import(".prisma/client").$Enums.TradeStatus;

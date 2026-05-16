@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AgentService } from './agent.service';
 import { SendMessageDto } from './dto/send-message.dto';
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
+
   constructor(
     private prisma: PrismaService,
     private agent: AgentService,
@@ -47,7 +49,7 @@ export class ChatService {
   }
 
   // ── Send a message (the core flow) ──
-  async sendMessage(userId: string, dto: SendMessageDto) {
+  async sendMessage(userId: string, dto: SendMessageDto, meta?: { requestId?: string; socketId?: string }) {
     let session: any;
 
     if (dto.sessionId) {
@@ -98,8 +100,10 @@ export class ChatService {
     // Run agent (with error safety net)
     let result: { answer: string; sqlQuery?: string; sqlResult?: string };
     try {
-      result = await this.agent.process(userId, dto.message, tradeAccountId, history);
+      result = await this.agent.process(userId, dto.message, tradeAccountId, history, meta?.requestId);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Agent process failed requestId=${meta?.requestId ?? 'n/a'} socketId=${meta?.socketId ?? 'n/a'}: ${msg}`);
       result = { answer: '❌ Sorry, I encountered an unexpected error. Please try again in a moment.' };
     }
 

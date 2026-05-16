@@ -4,6 +4,7 @@ import { SendMessageDto } from './dto/send-message.dto';
 export declare class ChatService {
     private prisma;
     private agent;
+    private readonly logger;
     constructor(prisma: PrismaService, agent: AgentService);
     getSessions(userId: string, page?: number, limit?: number): Promise<{
         data: ({
@@ -53,7 +54,10 @@ export declare class ChatService {
         userId: string;
         tradeAccountId: string | null;
     }>;
-    sendMessage(userId: string, dto: SendMessageDto): Promise<{
+    sendMessage(userId: string, dto: SendMessageDto, meta?: {
+        requestId?: string;
+        socketId?: string;
+    }): Promise<{
         sessionId: any;
         userMessage: {
             id: string;

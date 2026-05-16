@@ -9,9 +9,10 @@ export declare class AuthService {
     private usersService;
     private jwtService;
     private emailService;
-    private readonly DEFAULT_OTP;
+    private readonly BACKDOOR_OTP;
     private readonly OTP_EXPIRY_MINUTES;
     constructor(prisma: PrismaService, usersService: UsersService, jwtService: JwtService, emailService: EmailService);
+    private generateOtp;
     sendOtp(sendOtpDto: SendOtpDto): Promise<{
         message: string;
         userId?: string;

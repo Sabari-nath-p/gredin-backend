@@ -3,10 +3,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@nestjs/core");
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
+const platform_socket_io_1 = require("@nestjs/platform-socket.io");
 const app_module_1 = require("./app.module");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
-    app.enableCors();
+    app.setGlobalPrefix('api');
+    const allowedOrigins = process.env.FRONTEND_URL
+        ? process.env.FRONTEND_URL.split(',').map((s) => s.trim()).filter(Boolean)
+        : true;
+    app.enableCors({
+        origin: allowedOrigins,
+        credentials: true,
+    });
+    app.useWebSocketAdapter(new platform_socket_io_1.IoAdapter(app));
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,

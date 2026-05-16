@@ -33,20 +33,27 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Payload should include: { userId, message, sessionId?, tradeAccountId? }
   @SubscribeMessage('chat.send')
   async handleChatSend(client: Socket, payload: any) {
+    const requestId = `${client.id}-${Date.now()}`;
+    const startedAt = Date.now();
     try {
-      client.emit('chat.status', { status: 'processing' });
+      this.logger.log(`chat.send start requestId=${requestId} userId=${payload?.userId ?? 'unknown'} sessionId=${payload?.sessionId ?? 'new'}`);
+      client.emit('chat.status', { status: 'processing', requestId });
 
       const res = await this.chatService.sendMessage(payload.userId, {
         message: payload.message,
         sessionId: payload.sessionId,
         tradeAccountId: payload.tradeAccountId,
-      });
+      }, { requestId, socketId: client.id });
 
       client.emit('chat.assistantMessage', { assistant: res.assistantMessage, sessionId: res.sessionId });
-      client.emit('chat.status', { status: 'done' });
+      this.logger.log(`chat.send done requestId=${requestId} ms=${Date.now() - startedAt}`);
     } catch (err: any) {
-      this.logger.error(`chat.send failed: ${err?.message || err}`);
-      client.emit('chat.error', { message: err?.message || 'Chat failed' });
+      const message = err?.message || String(err);
+      this.logger.error(`chat.send failed requestId=${requestId} ms=${Date.now() - startedAt}: ${message}`);
+      client.emit('chat.error', { message, requestId });
+    } finally {
+      // Always resolve UI "thinking" state
+      client.emit('chat.status', { status: 'done', requestId });
     }
   }
 }
