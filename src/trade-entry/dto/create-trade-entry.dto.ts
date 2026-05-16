@@ -105,7 +105,7 @@ export class CreateTradeEntryDto {
     @Type(() => Number)
     @IsNumber()
     @IsOptional()
-    @Min(1)
+    @Min(0)
     positionSize?: number;
 
     @ApiProperty({

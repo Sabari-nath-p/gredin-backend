@@ -8,11 +8,20 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('api');
 
-  // Enable WebSockets
-  app.useWebSocketAdapter(new IoAdapter(app));
+  // Enable CORS for HTTP and WebSockets
+  // - If FRONTEND_URL is set, you can provide a comma-separated allowlist
+  // - Otherwise, reflect request origin (useful behind a reverse proxy)
+  const allowedOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map((s) => s.trim()).filter(Boolean)
+    : true;
 
-  // Enable CORS
-  app.enableCors();
+  app.enableCors({
+    origin: allowedOrigins,
+    credentials: true,
+  });
+
+  // Enable WebSockets with CORS
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   // Global validation pipe
   app.useGlobalPipes(
