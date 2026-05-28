@@ -65,7 +65,8 @@ export class TradeEntryService {
         }
 
         const weights = scorecardFields.map((f) => f.config.weight);
-        const definedCount = weights.filter((w) => w !== undefined && w !== null).length;
+        const definedWeights = weights.filter((w): w is number => w !== undefined && w !== null);
+        const definedCount = definedWeights.length;
 
         if (definedCount !== 0 && definedCount !== scorecardFields.length) {
             throw new BadRequestException('Either set weights for all scorecard questions or leave all weights empty');
@@ -73,14 +74,14 @@ export class TradeEntryService {
 
         // Manual weights
         if (definedCount === scorecardFields.length) {
-            const sum = weights.reduce((acc, w) => acc + Number(w), 0);
+            const sum = definedWeights.reduce((acc, w) => acc + w, 0);
             const roundedSum = this.round2(sum);
             if (roundedSum !== 100) {
                 throw new BadRequestException('Scorecard question weights must total exactly 100%');
             }
 
             return Object.fromEntries(
-                scorecardFields.map((f) => [f.id, this.round2(Number(f.config.weight))]),
+                scorecardFields.map((f) => [f.id, this.round2(f.config.weight!)]),
             );
         }
 

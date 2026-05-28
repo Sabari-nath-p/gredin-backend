@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateLogTemplateDto = exports.CreateTemplateFieldDto = exports.FieldType = void 0;
+exports.CreateLogTemplateDto = exports.CreateTemplateFieldDto = exports.ScorecardConfigDto = exports.ScorecardOptionDto = exports.FieldType = void 0;
 const swagger_1 = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
@@ -20,7 +20,55 @@ var FieldType;
     FieldType["CHECKBOX"] = "CHECKBOX";
     FieldType["IMAGE"] = "IMAGE";
     FieldType["MULTIPLE_CHOICE"] = "MULTIPLE_CHOICE";
+    FieldType["SCORECARD"] = "SCORECARD";
 })(FieldType || (exports.FieldType = FieldType = {}));
+class ScorecardOptionDto {
+    label;
+    score;
+}
+exports.ScorecardOptionDto = ScorecardOptionDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Option label', example: 'Followed plan' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], ScorecardOptionDto.prototype, "label", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Option score (0-100)', example: 80, minimum: 0, maximum: 100 }),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(100),
+    __metadata("design:type", Number)
+], ScorecardOptionDto.prototype, "score", void 0);
+class ScorecardConfigDto {
+    weight;
+    options;
+}
+exports.ScorecardConfigDto = ScorecardConfigDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Question weight percentage (optional). If omitted for all scorecard questions, weights are auto-distributed to sum to 100%.',
+        example: 25,
+        required: false,
+        minimum: 0,
+        maximum: 100,
+    }),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(100),
+    __metadata("design:type", Number)
+], ScorecardConfigDto.prototype, "weight", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Answer options', type: [ScorecardOptionDto] }),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ArrayNotEmpty)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => ScorecardOptionDto),
+    __metadata("design:type", Array)
+], ScorecardConfigDto.prototype, "options", void 0);
 class CreateTemplateFieldDto {
     fieldName;
     fieldType;
@@ -28,6 +76,7 @@ class CreateTemplateFieldDto {
     placeholder;
     defaultValue;
     fieldOptions;
+    scorecard;
 }
 exports.CreateTemplateFieldDto = CreateTemplateFieldDto;
 __decorate([
@@ -75,6 +124,18 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
 ], CreateTemplateFieldDto.prototype, "fieldOptions", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Scorecard configuration for SCORECARD fields',
+        required: false,
+        type: ScorecardConfigDto,
+    }),
+    (0, class_validator_1.ValidateIf)((o) => o.fieldType === FieldType.SCORECARD),
+    (0, class_validator_1.ValidateNested)(),
+    (0, class_transformer_1.Type)(() => ScorecardConfigDto),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", ScorecardConfigDto)
+], CreateTemplateFieldDto.prototype, "scorecard", void 0);
 class CreateLogTemplateDto {
     name;
     description;

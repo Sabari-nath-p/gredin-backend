@@ -3,7 +3,16 @@ export declare enum FieldType {
     LONG_TEXT = "LONG_TEXT",
     CHECKBOX = "CHECKBOX",
     IMAGE = "IMAGE",
-    MULTIPLE_CHOICE = "MULTIPLE_CHOICE"
+    MULTIPLE_CHOICE = "MULTIPLE_CHOICE",
+    SCORECARD = "SCORECARD"
+}
+export declare class ScorecardOptionDto {
+    label: string;
+    score: number;
+}
+export declare class ScorecardConfigDto {
+    weight?: number;
+    options: ScorecardOptionDto[];
 }
 export declare class CreateTemplateFieldDto {
     fieldName: string;
@@ -12,6 +21,7 @@ export declare class CreateTemplateFieldDto {
     placeholder?: string;
     defaultValue?: string;
     fieldOptions?: string[];
+    scorecard?: ScorecardConfigDto;
 }
 export declare class CreateLogTemplateDto {
     name: string;

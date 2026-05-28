@@ -6,6 +6,12 @@ import { TradeEntry, UserRole, Prisma } from '@prisma/client';
 export declare class TradeEntryService {
     private prisma;
     constructor(prisma: PrismaService);
+    private round2;
+    private parseScorecardConfig;
+    private computeScorecardWeights;
+    private findIncomingTextValue;
+    private matchScorecardOption;
+    private buildScorecardWrites;
     private normalizeRealisedProfitLoss;
     private getBalanceChange;
     create(userId: string, createDto: CreateTradeEntryDto): Promise<TradeEntry>;
@@ -33,6 +39,10 @@ export declare class TradeEntryService {
                 booleanValue: boolean | null;
                 imageUrl: string | null;
                 tradeEntryId: string;
+                selectedOption: string | null;
+                selectedScore: number | null;
+                questionWeight: Prisma.Decimal | null;
+                contribution: Prisma.Decimal | null;
             })[];
         } & {
             result: import(".prisma/client").$Enums.TradeResult | null;
@@ -51,6 +61,7 @@ export declare class TradeEntryService {
             realisedProfitLoss: Prisma.Decimal | null;
             serviceCharge: Prisma.Decimal;
             notes: string | null;
+            tradeScore: Prisma.Decimal | null;
             mt5TicketId: string | null;
         })[];
         meta: {

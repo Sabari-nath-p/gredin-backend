@@ -129,7 +129,8 @@ export class LogTemplateService {
         }
 
         const weights = scorecardFields.map((f) => f.scorecard?.weight);
-        const definedCount = weights.filter((w) => w !== undefined && w !== null).length;
+        const definedWeights = weights.filter((w): w is number => w !== undefined && w !== null);
+        const definedCount = definedWeights.length;
 
         // Manual weightage is optional, but must be consistent.
         if (definedCount !== 0 && definedCount !== scorecardFields.length) {
@@ -137,7 +138,7 @@ export class LogTemplateService {
         }
 
         if (definedCount === scorecardFields.length) {
-            const sum = weights.reduce((acc, w) => acc + Number(w), 0);
+            const sum = definedWeights.reduce((acc, w) => acc + w, 0);
             const roundedSum = Math.round((sum + Number.EPSILON) * 100) / 100;
             if (roundedSum !== 100) {
                 throw new BadRequestException('Scorecard question weights must total exactly 100%');

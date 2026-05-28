@@ -20,6 +20,143 @@ let TradeEntryService = class TradeEntryService {
     constructor(prisma) {
         this.prisma = prisma;
     }
+    round2(value) {
+        return Math.round((value + Number.EPSILON) * 100) / 100;
+    }
+    parseScorecardConfig(fieldOptions) {
+        if (!fieldOptions) {
+            return null;
+        }
+        try {
+            const parsed = JSON.parse(fieldOptions);
+            if (!parsed || typeof parsed !== 'object') {
+                return null;
+            }
+            const optionsRaw = parsed.options;
+            if (!Array.isArray(optionsRaw) || optionsRaw.length === 0) {
+                return null;
+            }
+            const options = optionsRaw
+                .filter((o) => o && typeof o === 'object')
+                .map((o) => ({ label: String(o.label ?? '').trim(), score: Number(o.score) }))
+                .filter((o) => o.label.length > 0 && Number.isFinite(o.score) && o.score >= 0 && o.score <= 100);
+            if (options.length === 0) {
+                return null;
+            }
+            const weightRaw = parsed.weight;
+            const cfg = { options };
+            if (weightRaw !== undefined && weightRaw !== null && Number.isFinite(Number(weightRaw))) {
+                cfg.weight = Number(weightRaw);
+            }
+            return cfg;
+        }
+        catch {
+            return null;
+        }
+    }
+    computeScorecardWeights(scorecardFields) {
+        if (scorecardFields.length === 0) {
+            return {};
+        }
+        const weights = scorecardFields.map((f) => f.config.weight);
+        const definedWeights = weights.filter((w) => w !== undefined && w !== null);
+        const definedCount = definedWeights.length;
+        if (definedCount !== 0 && definedCount !== scorecardFields.length) {
+            throw new common_1.BadRequestException('Either set weights for all scorecard questions or leave all weights empty');
+        }
+        if (definedCount === scorecardFields.length) {
+            const sum = definedWeights.reduce((acc, w) => acc + w, 0);
+            const roundedSum = this.round2(sum);
+            if (roundedSum !== 100) {
+                throw new common_1.BadRequestException('Scorecard question weights must total exactly 100%');
+            }
+            return Object.fromEntries(scorecardFields.map((f) => [f.id, this.round2(f.config.weight)]));
+        }
+        const n = scorecardFields.length;
+        const base = Math.floor((100 / n) * 100) / 100;
+        const result = {};
+        let running = 0;
+        for (let i = 0; i < n; i++) {
+            const id = scorecardFields[i].id;
+            if (i === n - 1) {
+                result[id] = this.round2(100 - running);
+            }
+            else {
+                result[id] = base;
+                running = this.round2(running + base);
+            }
+        }
+        return result;
+    }
+    findIncomingTextValue(incoming, fieldId) {
+        const item = incoming.find((fv) => fv.fieldId === fieldId);
+        const text = (item?.textValue ?? '').trim();
+        return text.length > 0 ? text : null;
+    }
+    matchScorecardOption(options, selected) {
+        const wanted = selected.trim().toLowerCase();
+        return options.find((o) => o.label.trim().toLowerCase() === wanted) ?? null;
+    }
+    async buildScorecardWrites(prisma, tradeAccountId, tradeEntryId, incomingFieldValues) {
+        const account = await prisma.tradeAccount.findUnique({
+            where: { id: tradeAccountId },
+            select: {
+                logTemplate: {
+                    select: {
+                        fields: {
+                            select: { id: true, fieldType: true, fieldOptions: true },
+                            orderBy: { fieldOrder: 'asc' },
+                        },
+                    },
+                },
+            },
+        });
+        const fields = account?.logTemplate?.fields ?? [];
+        const scorecardFields = fields
+            .filter((f) => f.fieldType === 'SCORECARD')
+            .map((f) => ({
+            id: f.id,
+            config: this.parseScorecardConfig(f.fieldOptions),
+        }))
+            .filter((f) => f.config && Array.isArray(f.config.options) && f.config.options.length > 0);
+        if (scorecardFields.length === 0) {
+            return { scorecardFieldIds: new Set(), writes: [], tradeScore: null };
+        }
+        const weightById = this.computeScorecardWeights(scorecardFields);
+        const writes = [];
+        let total = 0;
+        for (const f of scorecardFields) {
+            const weight = weightById[f.id];
+            const selected = this.findIncomingTextValue(incomingFieldValues, f.id);
+            if (!selected) {
+                writes.push({
+                    fieldId: f.id,
+                    textValue: null,
+                    selectedOption: null,
+                    selectedScore: 0,
+                    questionWeight: weight,
+                    contribution: 0,
+                });
+                continue;
+            }
+            const option = this.matchScorecardOption(f.config.options, selected);
+            if (!option) {
+                throw new common_1.BadRequestException('Invalid scorecard selection');
+            }
+            const contribution = this.round2((option.score / 100) * weight);
+            total = this.round2(total + contribution);
+            writes.push({
+                fieldId: f.id,
+                textValue: option.label,
+                selectedOption: option.label,
+                selectedScore: Math.round(option.score),
+                questionWeight: weight,
+                contribution,
+            });
+        }
+        const scorecardFieldIds = new Set(scorecardFields.map((f) => f.id));
+        return { scorecardFieldIds, writes, tradeScore: this.round2(total) };
+    }
     normalizeRealisedProfitLoss(result, realisedProfitLoss) {
         if (result === client_1.TradeResult.BREAK_EVEN) {
             return 0;
@@ -80,8 +217,13 @@ let TradeEntryService = class TradeEntryService {
                     notes: createDto.notes,
                 },
             });
-            if (createDto.fieldValues && createDto.fieldValues.length > 0) {
-                for (const fv of createDto.fieldValues) {
+            const incomingFieldValues = createDto.fieldValues ?? [];
+            const scorecard = await this.buildScorecardWrites(prisma, createDto.tradeAccountId, tradeEntry.id, incomingFieldValues.map((fv) => ({ fieldId: fv.fieldId, textValue: fv.textValue })));
+            if (incomingFieldValues.length > 0) {
+                for (const fv of incomingFieldValues) {
+                    if (scorecard.scorecardFieldIds.has(fv.fieldId)) {
+                        continue;
+                    }
                     await prisma.tradeFieldValue.create({
                         data: {
                             tradeEntryId: tradeEntry.id,
@@ -93,10 +235,31 @@ let TradeEntryService = class TradeEntryService {
                     });
                 }
             }
+            if (scorecard.writes.length > 0) {
+                for (const w of scorecard.writes) {
+                    await prisma.tradeFieldValue.create({
+                        data: {
+                            tradeEntryId: tradeEntry.id,
+                            fieldId: w.fieldId,
+                            textValue: w.textValue,
+                            selectedOption: w.selectedOption,
+                            selectedScore: w.selectedScore,
+                            questionWeight: w.questionWeight,
+                            contribution: w.contribution,
+                        },
+                    });
+                }
+                await prisma.tradeEntry.update({
+                    where: { id: tradeEntry.id },
+                    data: { tradeScore: scorecard.tradeScore },
+                });
+            }
             if (status === create_trade_entry_dto_1.TradeStatus.CLOSED) {
                 await this.updateAccountBalance(prisma, createDto.tradeAccountId, createDto.result, normalizedRealisedProfitLoss, createDto.serviceCharge || 0);
             }
-            return tradeEntry;
+            return prisma.tradeEntry.findUniqueOrThrow({
+                where: { id: tradeEntry.id },
+            });
         });
     }
     async findAllByAccount(tradeAccountId, userId, userRole, page = 1, limit = 20) {
@@ -192,8 +355,13 @@ let TradeEntryService = class TradeEntryService {
                         : {}),
                 },
             });
-            if (fieldValues && fieldValues.length > 0) {
-                for (const fieldValue of fieldValues) {
+            const incomingFieldValues = fieldValues ?? [];
+            const scorecard = await this.buildScorecardWrites(prisma, tradeEntry.tradeAccountId, id, incomingFieldValues.map((fv) => ({ fieldId: fv.fieldId, textValue: fv.textValue })));
+            if (incomingFieldValues.length > 0) {
+                for (const fieldValue of incomingFieldValues) {
+                    if (scorecard.scorecardFieldIds.has(fieldValue.fieldId)) {
+                        continue;
+                    }
                     await prisma.tradeFieldValue.upsert({
                         where: {
                             tradeEntryId_fieldId: {
@@ -215,6 +383,38 @@ let TradeEntryService = class TradeEntryService {
                         },
                     });
                 }
+            }
+            if (scorecard.writes.length > 0) {
+                for (const w of scorecard.writes) {
+                    await prisma.tradeFieldValue.upsert({
+                        where: {
+                            tradeEntryId_fieldId: {
+                                tradeEntryId: id,
+                                fieldId: w.fieldId,
+                            },
+                        },
+                        update: {
+                            textValue: w.textValue,
+                            selectedOption: w.selectedOption,
+                            selectedScore: w.selectedScore,
+                            questionWeight: w.questionWeight,
+                            contribution: w.contribution,
+                        },
+                        create: {
+                            tradeEntryId: id,
+                            fieldId: w.fieldId,
+                            textValue: w.textValue,
+                            selectedOption: w.selectedOption,
+                            selectedScore: w.selectedScore,
+                            questionWeight: w.questionWeight,
+                            contribution: w.contribution,
+                        },
+                    });
+                }
+                await prisma.tradeEntry.update({
+                    where: { id },
+                    data: { tradeScore: scorecard.tradeScore },
+                });
             }
             return prisma.tradeEntry.findUniqueOrThrow({
                 where: { id: updatedTrade.id },
@@ -254,8 +454,13 @@ let TradeEntryService = class TradeEntryService {
                     notes: closeDto.notes || tradeEntry.notes,
                 },
             });
-            if (closeDto.fieldValues && closeDto.fieldValues.length > 0) {
-                for (const fv of closeDto.fieldValues) {
+            const incomingFieldValues = closeDto.fieldValues ?? [];
+            const scorecard = await this.buildScorecardWrites(prisma, tradeEntry.tradeAccountId, id, incomingFieldValues.map((fv) => ({ fieldId: fv.fieldId, textValue: fv.textValue })));
+            if (incomingFieldValues.length > 0) {
+                for (const fv of incomingFieldValues) {
+                    if (scorecard.scorecardFieldIds.has(fv.fieldId)) {
+                        continue;
+                    }
                     await prisma.tradeFieldValue.upsert({
                         where: {
                             tradeEntryId_fieldId: {
@@ -278,8 +483,49 @@ let TradeEntryService = class TradeEntryService {
                     });
                 }
             }
+            if (scorecard.writes.length > 0) {
+                for (const w of scorecard.writes) {
+                    await prisma.tradeFieldValue.upsert({
+                        where: {
+                            tradeEntryId_fieldId: {
+                                tradeEntryId: id,
+                                fieldId: w.fieldId,
+                            },
+                        },
+                        update: {
+                            textValue: w.textValue,
+                            selectedOption: w.selectedOption,
+                            selectedScore: w.selectedScore,
+                            questionWeight: w.questionWeight,
+                            contribution: w.contribution,
+                        },
+                        create: {
+                            tradeEntryId: id,
+                            fieldId: w.fieldId,
+                            textValue: w.textValue,
+                            selectedOption: w.selectedOption,
+                            selectedScore: w.selectedScore,
+                            questionWeight: w.questionWeight,
+                            contribution: w.contribution,
+                        },
+                    });
+                }
+                await prisma.tradeEntry.update({
+                    where: { id },
+                    data: { tradeScore: scorecard.tradeScore },
+                });
+            }
             await this.updateAccountBalance(prisma, tradeEntry.tradeAccountId, closeDto.result, normalizedRealisedProfitLoss, closeDto.serviceCharge || tradeEntry.serviceCharge.toNumber());
-            return updatedTrade;
+            return prisma.tradeEntry.findUniqueOrThrow({
+                where: { id: updatedTrade.id },
+                include: {
+                    fieldValues: {
+                        include: {
+                            field: true,
+                        },
+                    },
+                },
+            });
         });
     }
     async delete(id, userId, userRole) {

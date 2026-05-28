@@ -1,4 +1,4 @@
-import { FieldType } from './create-log-template.dto';
+import { FieldType, ScorecardConfigDto } from './create-log-template.dto';
 export declare class UpdateTemplateFieldDto {
     id?: string;
     fieldName?: string;
@@ -7,6 +7,7 @@ export declare class UpdateTemplateFieldDto {
     placeholder?: string;
     defaultValue?: string;
     fieldOptions?: string[];
+    scorecard?: ScorecardConfigDto;
 }
 export declare class UpdateLogTemplateDto {
     name?: string;

@@ -6,7 +6,9 @@ export declare class LogTemplateService {
     private prisma;
     constructor(prisma: PrismaService);
     private serializeFieldOptions;
-    private deserializeFieldOptions;
+    private deserializeMultipleChoiceOptions;
+    private deserializeScorecardConfig;
+    private validateScorecardFields;
     private mapTemplate;
     create(userId: string, dto: CreateLogTemplateDto): Promise<any>;
     findAllByUser(userId: string, page?: number, limit?: number): Promise<{

@@ -22,6 +22,7 @@ class UpdateTemplateFieldDto {
     placeholder;
     defaultValue;
     fieldOptions;
+    scorecard;
 }
 exports.UpdateTemplateFieldDto = UpdateTemplateFieldDto;
 __decorate([
@@ -71,6 +72,14 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
 ], UpdateTemplateFieldDto.prototype, "fieldOptions", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Scorecard configuration for SCORECARD fields', required: false, type: create_log_template_dto_1.ScorecardConfigDto }),
+    (0, class_validator_1.ValidateIf)((o) => o.fieldType === create_log_template_dto_1.FieldType.SCORECARD),
+    (0, class_validator_1.ValidateNested)(),
+    (0, class_transformer_1.Type)(() => create_log_template_dto_1.ScorecardConfigDto),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", create_log_template_dto_1.ScorecardConfigDto)
+], UpdateTemplateFieldDto.prototype, "scorecard", void 0);
 class UpdateLogTemplateDto {
     name;
     description;
