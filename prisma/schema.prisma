@@ -133,6 +133,7 @@ model TradeEntry {
   updatedAt             DateTime            @updatedAt
   mt5TicketId           String?
   fieldValues           TradeFieldValue[]
+  tradeScore            Decimal?            @db.Decimal(5, 2)
   
   @@index([tradeAccountId])
   @@index([status])
@@ -149,6 +150,7 @@ enum FieldType {
   CHECKBOX
   IMAGE
   MULTIPLE_CHOICE
+  SCORECARD
 }
 
 model LogTemplate {
@@ -192,6 +194,10 @@ model TradeFieldValue {
   textValue     String?           @db.Text
   booleanValue  Boolean?
   imageUrl      String?           @db.Text
+  selectedOption String?          @db.Text
+  selectedScore  Int?
+  questionWeight Decimal?         @db.Decimal(5, 2)
+  contribution   Decimal?         @db.Decimal(5, 2)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 

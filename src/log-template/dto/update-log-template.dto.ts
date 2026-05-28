@@ -12,7 +12,7 @@ import {
     ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { FieldType } from './create-log-template.dto';
+import { FieldType, ScorecardConfigDto } from './create-log-template.dto';
 
 export class UpdateTemplateFieldDto {
     @ApiProperty({ description: 'Field ID (omit for new fields)', required: false })
@@ -54,6 +54,13 @@ export class UpdateTemplateFieldDto {
     @IsString({ each: true })
     @IsOptional()
     fieldOptions?: string[];
+
+    @ApiProperty({ description: 'Scorecard configuration for SCORECARD fields', required: false, type: ScorecardConfigDto })
+    @ValidateIf((o) => o.fieldType === FieldType.SCORECARD)
+    @ValidateNested()
+    @Type(() => ScorecardConfigDto)
+    @IsOptional()
+    scorecard?: ScorecardConfigDto;
 }
 
 export class UpdateLogTemplateDto {

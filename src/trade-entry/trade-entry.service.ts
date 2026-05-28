@@ -11,9 +11,208 @@ import { UpdateTradeEntryDto } from './dto/update-trade-entry.dto';
 import { CloseTradeDto } from './dto/close-trade.dto';
 import { TradeEntry, UserRole, Prisma } from '@prisma/client';
 
+type ScorecardOption = { label: string; score: number };
+type ScorecardConfig = { weight?: number; options: ScorecardOption[] };
+
 @Injectable()
 export class TradeEntryService {
     constructor(private prisma: PrismaService) { }
+
+    private round2(value: number): number {
+        return Math.round((value + Number.EPSILON) * 100) / 100;
+    }
+
+    private parseScorecardConfig(fieldOptions: string | null): ScorecardConfig | null {
+        if (!fieldOptions) {
+            return null;
+        }
+
+        try {
+            const parsed = JSON.parse(fieldOptions);
+            if (!parsed || typeof parsed !== 'object') {
+                return null;
+            }
+
+            const optionsRaw = (parsed as any).options;
+            if (!Array.isArray(optionsRaw) || optionsRaw.length === 0) {
+                return null;
+            }
+
+            const options: ScorecardOption[] = optionsRaw
+                .filter((o: any) => o && typeof o === 'object')
+                .map((o: any) => ({ label: String(o.label ?? '').trim(), score: Number(o.score) }))
+                .filter((o: any) => o.label.length > 0 && Number.isFinite(o.score) && o.score >= 0 && o.score <= 100);
+
+            if (options.length === 0) {
+                return null;
+            }
+
+            const weightRaw = (parsed as any).weight;
+            const cfg: ScorecardConfig = { options };
+            if (weightRaw !== undefined && weightRaw !== null && Number.isFinite(Number(weightRaw))) {
+                cfg.weight = Number(weightRaw);
+            }
+
+            return cfg;
+        } catch {
+            return null;
+        }
+    }
+
+    private computeScorecardWeights(scorecardFields: Array<{ id: string; config: ScorecardConfig }>): Record<string, number> {
+        if (scorecardFields.length === 0) {
+            return {};
+        }
+
+        const weights = scorecardFields.map((f) => f.config.weight);
+        const definedCount = weights.filter((w) => w !== undefined && w !== null).length;
+
+        if (definedCount !== 0 && definedCount !== scorecardFields.length) {
+            throw new BadRequestException('Either set weights for all scorecard questions or leave all weights empty');
+        }
+
+        // Manual weights
+        if (definedCount === scorecardFields.length) {
+            const sum = weights.reduce((acc, w) => acc + Number(w), 0);
+            const roundedSum = this.round2(sum);
+            if (roundedSum !== 100) {
+                throw new BadRequestException('Scorecard question weights must total exactly 100%');
+            }
+
+            return Object.fromEntries(
+                scorecardFields.map((f) => [f.id, this.round2(Number(f.config.weight))]),
+            );
+        }
+
+        // Auto-distribute weights to sum exactly 100 (2-decimal precision)
+        const n = scorecardFields.length;
+        const base = Math.floor((100 / n) * 100) / 100;
+        const result: Record<string, number> = {};
+        let running = 0;
+
+        for (let i = 0; i < n; i++) {
+            const id = scorecardFields[i].id;
+            if (i === n - 1) {
+                result[id] = this.round2(100 - running);
+            } else {
+                result[id] = base;
+                running = this.round2(running + base);
+            }
+        }
+
+        return result;
+    }
+
+    private findIncomingTextValue(
+        incoming: Array<{ fieldId: string; textValue?: string }>,
+        fieldId: string,
+    ): string | null {
+        const item = incoming.find((fv) => fv.fieldId === fieldId);
+        const text = (item?.textValue ?? '').trim();
+        return text.length > 0 ? text : null;
+    }
+
+    private matchScorecardOption(options: ScorecardOption[], selected: string): ScorecardOption | null {
+        const wanted = selected.trim().toLowerCase();
+        return options.find((o) => o.label.trim().toLowerCase() === wanted) ?? null;
+    }
+
+    private async buildScorecardWrites(
+        prisma: any,
+        tradeAccountId: string,
+        tradeEntryId: string,
+        incomingFieldValues: Array<{ fieldId: string; textValue?: string }>,
+    ): Promise<{
+        scorecardFieldIds: Set<string>;
+        writes: Array<{
+            fieldId: string;
+            textValue: string | null;
+            selectedOption: string | null;
+            selectedScore: number;
+            questionWeight: number;
+            contribution: number;
+        }>;
+        tradeScore: number | null;
+    }> {
+        const account = await prisma.tradeAccount.findUnique({
+            where: { id: tradeAccountId },
+            select: {
+                logTemplate: {
+                    select: {
+                        fields: {
+                            select: { id: true, fieldType: true, fieldOptions: true },
+                            orderBy: { fieldOrder: 'asc' },
+                        },
+                    },
+                },
+            },
+        });
+
+        const fields = account?.logTemplate?.fields ?? [];
+        const scorecardFields = fields
+            .filter((f: any) => f.fieldType === 'SCORECARD')
+            .map((f: any) => ({
+                id: f.id as string,
+                config: this.parseScorecardConfig(f.fieldOptions) as ScorecardConfig | null,
+            }))
+            .filter((f: any) => f.config && Array.isArray(f.config.options) && f.config.options.length > 0) as Array<{
+            id: string;
+            config: ScorecardConfig;
+        }>;
+
+        if (scorecardFields.length === 0) {
+            return { scorecardFieldIds: new Set(), writes: [], tradeScore: null };
+        }
+
+        const weightById = this.computeScorecardWeights(scorecardFields);
+        const writes: Array<{
+            fieldId: string;
+            textValue: string | null;
+            selectedOption: string | null;
+            selectedScore: number;
+            questionWeight: number;
+            contribution: number;
+        }> = [];
+
+        let total = 0;
+
+        for (const f of scorecardFields) {
+            const weight = weightById[f.id];
+            const selected = this.findIncomingTextValue(incomingFieldValues, f.id);
+
+            if (!selected) {
+                writes.push({
+                    fieldId: f.id,
+                    textValue: null,
+                    selectedOption: null,
+                    selectedScore: 0,
+                    questionWeight: weight,
+                    contribution: 0,
+                });
+                continue;
+            }
+
+            const option = this.matchScorecardOption(f.config.options, selected);
+            if (!option) {
+                throw new BadRequestException('Invalid scorecard selection');
+            }
+
+            const contribution = this.round2((option.score / 100) * weight);
+            total = this.round2(total + contribution);
+
+            writes.push({
+                fieldId: f.id,
+                textValue: option.label,
+                selectedOption: option.label,
+                selectedScore: Math.round(option.score),
+                questionWeight: weight,
+                contribution,
+            });
+        }
+
+        const scorecardFieldIds = new Set(scorecardFields.map((f) => f.id));
+        return { scorecardFieldIds, writes, tradeScore: this.round2(total) };
+    }
 
     private normalizeRealisedProfitLoss(result: TradeResult, realisedProfitLoss: number): number {
         if (result === TradeResult.BREAK_EVEN) {
@@ -92,8 +291,21 @@ export class TradeEntryService {
                 },
             });
 
-            if (createDto.fieldValues && createDto.fieldValues.length > 0) {
-                for (const fv of createDto.fieldValues) {
+            const incomingFieldValues = createDto.fieldValues ?? [];
+            const scorecard = await this.buildScorecardWrites(
+                prisma,
+                createDto.tradeAccountId,
+                tradeEntry.id,
+                incomingFieldValues.map((fv) => ({ fieldId: fv.fieldId, textValue: fv.textValue })),
+            );
+
+            if (incomingFieldValues.length > 0) {
+                for (const fv of incomingFieldValues) {
+                    // Scorecard values are handled separately (server-computed)
+                    if (scorecard.scorecardFieldIds.has(fv.fieldId)) {
+                        continue;
+                    }
+
                     await prisma.tradeFieldValue.create({
                         data: {
                             tradeEntryId: tradeEntry.id,
@@ -106,6 +318,27 @@ export class TradeEntryService {
                 }
             }
 
+            if (scorecard.writes.length > 0) {
+                for (const w of scorecard.writes) {
+                    await prisma.tradeFieldValue.create({
+                        data: {
+                            tradeEntryId: tradeEntry.id,
+                            fieldId: w.fieldId,
+                            textValue: w.textValue,
+                            selectedOption: w.selectedOption,
+                            selectedScore: w.selectedScore,
+                            questionWeight: w.questionWeight,
+                            contribution: w.contribution,
+                        },
+                    });
+                }
+
+                await prisma.tradeEntry.update({
+                    where: { id: tradeEntry.id },
+                    data: { tradeScore: scorecard.tradeScore },
+                });
+            }
+
             if (status === TradeStatus.CLOSED) {
                 await this.updateAccountBalance(
                     prisma,
@@ -116,7 +349,9 @@ export class TradeEntryService {
                 );
             }
 
-            return tradeEntry;
+            return prisma.tradeEntry.findUniqueOrThrow({
+                where: { id: tradeEntry.id },
+            });
         });
     }
 
@@ -244,8 +479,20 @@ export class TradeEntryService {
                 },
             });
 
-            if (fieldValues && fieldValues.length > 0) {
-                for (const fieldValue of fieldValues) {
+            const incomingFieldValues = fieldValues ?? [];
+            const scorecard = await this.buildScorecardWrites(
+                prisma,
+                tradeEntry.tradeAccountId,
+                id,
+                incomingFieldValues.map((fv) => ({ fieldId: fv.fieldId, textValue: fv.textValue })),
+            );
+
+            if (incomingFieldValues.length > 0) {
+                for (const fieldValue of incomingFieldValues) {
+                    if (scorecard.scorecardFieldIds.has(fieldValue.fieldId)) {
+                        continue;
+                    }
+
                     await prisma.tradeFieldValue.upsert({
                         where: {
                             tradeEntryId_fieldId: {
@@ -267,6 +514,40 @@ export class TradeEntryService {
                         },
                     });
                 }
+            }
+
+            if (scorecard.writes.length > 0) {
+                for (const w of scorecard.writes) {
+                    await prisma.tradeFieldValue.upsert({
+                        where: {
+                            tradeEntryId_fieldId: {
+                                tradeEntryId: id,
+                                fieldId: w.fieldId,
+                            },
+                        },
+                        update: {
+                            textValue: w.textValue,
+                            selectedOption: w.selectedOption,
+                            selectedScore: w.selectedScore,
+                            questionWeight: w.questionWeight,
+                            contribution: w.contribution,
+                        },
+                        create: {
+                            tradeEntryId: id,
+                            fieldId: w.fieldId,
+                            textValue: w.textValue,
+                            selectedOption: w.selectedOption,
+                            selectedScore: w.selectedScore,
+                            questionWeight: w.questionWeight,
+                            contribution: w.contribution,
+                        },
+                    });
+                }
+
+                await prisma.tradeEntry.update({
+                    where: { id },
+                    data: { tradeScore: scorecard.tradeScore },
+                });
             }
 
             return prisma.tradeEntry.findUniqueOrThrow({
@@ -327,8 +608,20 @@ export class TradeEntryService {
             });
 
             // Save/update dynamic field values if provided
-            if (closeDto.fieldValues && closeDto.fieldValues.length > 0) {
-                for (const fv of closeDto.fieldValues) {
+            const incomingFieldValues = closeDto.fieldValues ?? [];
+            const scorecard = await this.buildScorecardWrites(
+                prisma,
+                tradeEntry.tradeAccountId,
+                id,
+                incomingFieldValues.map((fv) => ({ fieldId: fv.fieldId, textValue: fv.textValue })),
+            );
+
+            if (incomingFieldValues.length > 0) {
+                for (const fv of incomingFieldValues) {
+                    if (scorecard.scorecardFieldIds.has(fv.fieldId)) {
+                        continue;
+                    }
+
                     await prisma.tradeFieldValue.upsert({
                         where: {
                             tradeEntryId_fieldId: {
@@ -352,6 +645,40 @@ export class TradeEntryService {
                 }
             }
 
+            if (scorecard.writes.length > 0) {
+                for (const w of scorecard.writes) {
+                    await prisma.tradeFieldValue.upsert({
+                        where: {
+                            tradeEntryId_fieldId: {
+                                tradeEntryId: id,
+                                fieldId: w.fieldId,
+                            },
+                        },
+                        update: {
+                            textValue: w.textValue,
+                            selectedOption: w.selectedOption,
+                            selectedScore: w.selectedScore,
+                            questionWeight: w.questionWeight,
+                            contribution: w.contribution,
+                        },
+                        create: {
+                            tradeEntryId: id,
+                            fieldId: w.fieldId,
+                            textValue: w.textValue,
+                            selectedOption: w.selectedOption,
+                            selectedScore: w.selectedScore,
+                            questionWeight: w.questionWeight,
+                            contribution: w.contribution,
+                        },
+                    });
+                }
+
+                await prisma.tradeEntry.update({
+                    where: { id },
+                    data: { tradeScore: scorecard.tradeScore },
+                });
+            }
+
             // Update account balance
             await this.updateAccountBalance(
                 prisma,
@@ -361,7 +688,16 @@ export class TradeEntryService {
                 closeDto.serviceCharge || tradeEntry.serviceCharge.toNumber(),
             );
 
-            return updatedTrade;
+            return prisma.tradeEntry.findUniqueOrThrow({
+                where: { id: updatedTrade.id },
+                include: {
+                    fieldValues: {
+                        include: {
+                            field: true,
+                        },
+                    },
+                },
+            });
         });
     }
 

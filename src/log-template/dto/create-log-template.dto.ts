@@ -10,6 +10,8 @@ import {
     IsInt,
     Min,
     ValidateIf,
+    IsNumber,
+    Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -19,6 +21,44 @@ export enum FieldType {
     CHECKBOX = 'CHECKBOX',
     IMAGE = 'IMAGE',
     MULTIPLE_CHOICE = 'MULTIPLE_CHOICE',
+    SCORECARD = 'SCORECARD',
+}
+
+export class ScorecardOptionDto {
+    @ApiProperty({ description: 'Option label', example: 'Followed plan' })
+    @IsString()
+    @IsNotEmpty()
+    label: string;
+
+    @ApiProperty({ description: 'Option score (0-100)', example: 80, minimum: 0, maximum: 100 })
+    @Type(() => Number)
+    @IsNumber()
+    @Min(0)
+    @Max(100)
+    score: number;
+}
+
+export class ScorecardConfigDto {
+    @ApiProperty({
+        description: 'Question weight percentage (optional). If omitted for all scorecard questions, weights are auto-distributed to sum to 100%.',
+        example: 25,
+        required: false,
+        minimum: 0,
+        maximum: 100,
+    })
+    @Type(() => Number)
+    @IsNumber()
+    @IsOptional()
+    @Min(0)
+    @Max(100)
+    weight?: number;
+
+    @ApiProperty({ description: 'Answer options', type: [ScorecardOptionDto] })
+    @IsArray()
+    @ArrayNotEmpty()
+    @ValidateNested({ each: true })
+    @Type(() => ScorecardOptionDto)
+    options: ScorecardOptionDto[];
 }
 
 export class CreateTemplateFieldDto {
@@ -60,6 +100,17 @@ export class CreateTemplateFieldDto {
     @IsString({ each: true })
     @IsOptional()
     fieldOptions?: string[];
+
+    @ApiProperty({
+        description: 'Scorecard configuration for SCORECARD fields',
+        required: false,
+        type: ScorecardConfigDto,
+    })
+    @ValidateIf((o) => o.fieldType === FieldType.SCORECARD)
+    @ValidateNested()
+    @Type(() => ScorecardConfigDto)
+    @IsOptional()
+    scorecard?: ScorecardConfigDto;
 }
 
 export class CreateLogTemplateDto {
