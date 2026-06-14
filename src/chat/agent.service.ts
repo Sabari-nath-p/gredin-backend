@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import Groq from 'groq-sdk';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface AgentDecision {
@@ -51,7 +52,7 @@ const DB_SCHEMA_XML = `<schema>
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
-  private readonly apiKey: string;
+  private readonly groq: Groq;
   private readonly modelName: string;
   private readonly requestTimeoutMs: number;
 
@@ -59,9 +60,10 @@ export class AgentService {
     private config: ConfigService,
     private prisma: PrismaService,
   ) {
-    this.apiKey = this.config.get<string>('NVIDIA_API_KEY') || this.config.get<string>('GEMINI_API_KEY') || '';
-    this.modelName = this.config.get<string>('NVIDIA_MODEL') || 'minimaxai/minimax-m2.7';
-    this.requestTimeoutMs = Number(this.config.get<string>('NVIDIA_TIMEOUT_MS') || 45000);
+    const apiKey = this.config.get<string>('GROQ_API_KEY') || '';
+    this.groq = new Groq({ apiKey });
+    this.modelName = this.config.get<string>('GROQ_MODEL') || 'llama-3.3-70b-versatile';
+    this.requestTimeoutMs = Number(this.config.get<string>('GROQ_TIMEOUT_MS') || 30000);
   }
 
   private getErrorMessage(err: unknown): string {
@@ -81,10 +83,10 @@ export class AgentService {
     conversationHistory: { role: string; content: string }[],
     requestId?: string,
   ): Promise<AgentResult> {
-    if (!this.apiKey) {
+    if (!this.groq.apiKey) {
       return {
         answer:
-          'The AI assistant is not configured. Please set the NVIDIA_API_KEY environment variable.',
+          'The AI assistant is not configured. Please set the GROQ_API_KEY environment variable.',
       };
     }
 
@@ -172,7 +174,7 @@ export class AgentService {
       ? `<history>\n${history.slice(-6).map(h => `<msg role="${h.role}">${h.content.substring(0, 300)}</msg>`).join('\n')}\n</history>`
       : '';
 
-    const prompt = `You are a trading journal AI assistant. Decide whether the user's question requires querying their trade data from a MySQL database.
+    const prompt = `You are Gredin, a trading journal AI assistant. Decide whether the user's question requires querying their trade data from a MySQL database.
 
 ${DB_SCHEMA_XML}
 
@@ -255,7 +257,7 @@ Or if you cannot fix it:
       ? `<history>\n${history.slice(-4).map(h => `<msg role="${h.role}">${h.content.substring(0, 200)}</msg>`).join('\n')}\n</history>`
       : '';
 
-    const prompt = `You are a trading journal AI assistant. Answer the user's question using the data retrieved from their database.
+    const prompt = `You are Gredin, a trading journal AI assistant. Answer the user's question using the data retrieved from their database.
 
 ${historyXml}
 
@@ -331,59 +333,42 @@ ${historyXml}
     return result as any[];
   }
 
-  // ─────────── NVIDIA API Call ───────────
+  // ─────────── Groq API Call ───────────
   private async callModel(prompt: string, requestId?: string): Promise<string> {
-    const url = 'https://integrate.api.nvidia.com/v1/chat/completions';
-
+    const rid = requestId ? ` requestId=${requestId}` : '';
     try {
       const startedAt = Date.now();
-      const rid = requestId ? ` requestId=${requestId}` : '';
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
+      const completion = await this.groq.chat.completions.create(
+        {
           model: this.modelName,
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.1,
           top_p: 0.8,
           max_tokens: 1024,
-          stream: false,
-        }),
-      });
+        },
+        { timeout: this.requestTimeoutMs },
+      );
 
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        const errBody = await response.text();
-        this.logger.error(`NVIDIA API error${rid} status=${response.status} ms=${Date.now() - startedAt}: ${errBody.substring(0, 4000)}`);
-        if (response.status === 429) {
-          throw new Error('RATE_LIMITED: The AI service is temporarily busy. Please wait a moment and try again.');
-        }
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('AUTH_FAILED: The AI API key is invalid or expired. Please check configuration.');
-        }
-        throw new Error(`NVIDIA API returned ${response.status}`);
-      }
-
-      const data = await response.json();
-      const text = data?.choices?.[0]?.message?.content || '';
-      this.logger.debug(`NVIDIA API ok${rid} ms=${Date.now() - startedAt} chars=${text.length}`);
+      const text = completion.choices?.[0]?.message?.content || '';
+      this.logger.debug(`Groq API ok${rid} ms=${Date.now() - startedAt} chars=${text.length}`);
       return text.trim();
-    } catch (err) {
+    } catch (err: any) {
       const errorMessage = this.getErrorMessage(err);
-      if (errorMessage.includes('aborted') || errorMessage.includes('AbortError')) {
-        this.logger.error(`NVIDIA call timed out${requestId ? ` requestId=${requestId}` : ''} after ${this.requestTimeoutMs}ms: ${errorMessage}`);
+      // Groq SDK wraps rate-limit errors with status 429
+      if (err?.status === 429 || errorMessage.includes('rate_limit') || errorMessage.includes('RATE_LIMITED')) {
+        this.logger.error(`Groq rate limited${rid}: ${errorMessage}`);
+        throw new Error('RATE_LIMITED: The AI service is temporarily busy. Please wait a moment and try again.');
+      }
+      if (err?.status === 401 || err?.status === 403 || errorMessage.includes('AUTH_FAILED')) {
+        this.logger.error(`Groq auth failed${rid}: ${errorMessage}`);
+        throw new Error('AUTH_FAILED: The AI API key is invalid or expired. Please check configuration.');
+      }
+      if (errorMessage.includes('timed out') || errorMessage.includes('AbortError') || errorMessage.includes('ETIMEDOUT')) {
+        this.logger.error(`Groq call timed out${rid} after ${this.requestTimeoutMs}ms: ${errorMessage}`);
         throw new Error(`AI request timed out after ${Math.round(this.requestTimeoutMs / 1000)}s`);
       }
-      this.logger.error(`NVIDIA call failed${requestId ? ` requestId=${requestId}` : ''}: ${errorMessage}`);
+      this.logger.error(`Groq call failed${rid}: ${errorMessage}`);
       throw err;
     }
   }
